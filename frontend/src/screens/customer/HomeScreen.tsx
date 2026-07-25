@@ -15,7 +15,7 @@ import {
   ScrollView
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import DateTimePicker, { DateTimePickerChangeEvent } from "@react-native-community/datetimepicker";
 import { useCustomerHomeContext } from "../../context/customerContext/CustomerHomeContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -151,30 +151,20 @@ export default function HomeScreen() {
     setShowPicker(true);
   };
 
-  // Process selected dates safely
-  const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (event.type === "dismissed" || !selectedDate) {
-      setShowPicker(false);
-      return;
-    }
-
-    setShowPicker(false);
-
-    // Modern baseline comparison (removes precise microsecond deltas)
+  const applySelectedDate = (chosenDate: Date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const chosenDate = new Date(selectedDate);
-    chosenDate.setHours(0, 0, 0, 0);
+    const normalizedDate = new Date(chosenDate);
+    normalizedDate.setHours(0, 0, 0, 0);
 
     if (pickerMode === "start") {
-      if (chosenDate < today) {
+      if (normalizedDate < today) {
         Alert.alert("That Date Has Passed", "Please choose today or a date in the future.");
         return;
       }
-      setStartDateObj(chosenDate);
+      setStartDateObj(normalizedDate);
 
-      // Auto-invalidate matching End Dates that break chronological lines
-      if (endDateObj && chosenDate > endDateObj) {
+      if (endDateObj && normalizedDate > endDateObj) {
         setEndDateObj(null);
       }
     } else {
@@ -182,12 +172,21 @@ export default function HomeScreen() {
         Alert.alert("Choose Start Date First", "Please pick a Start Date before the End Date.");
         return;
       }
-      if (chosenDate < startDateObj) {
+      if (normalizedDate < startDateObj) {
         Alert.alert("Date Problem", "End Date cannot be before Start Date.");
         return;
       }
-      setEndDateObj(chosenDate);
+      setEndDateObj(normalizedDate);
     }
+  };
+
+  const handleValueChange = (_event: DateTimePickerChangeEvent, selectedDate: Date) => {
+    applySelectedDate(selectedDate);
+    setShowPicker(false);
+  };
+
+  const handleDismiss = () => {
+    setShowPicker(false);
   };
 
   // Pick a preset request type
@@ -446,21 +445,22 @@ export default function HomeScreen() {
                />
              </ScrollView>
 
-             {showPicker && (
-               <View style={styles.datePickerContainer}>
-                 <DateTimePicker
-                   value={
-                     pickerMode === "start"
-                       ? (startDateObj || new Date())
-                       : (endDateObj || startDateObj || new Date())
-                   }
-                   mode="date"
-                   display={Platform.OS === "ios" ? "spinner" : "default"}
-                   minimumDate={pickerMode === "end" && startDateObj ? startDateObj : new Date()}
-                   onChange={onDateChange}
-                 />
-               </View>
-             )}
+              {showPicker && (
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={
+                      pickerMode === "start"
+                        ? (startDateObj || new Date())
+                        : (endDateObj || startDateObj || new Date())
+                    }
+                    mode="date"
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    minimumDate={pickerMode === "end" && startDateObj ? startDateObj : new Date()}
+                    onValueChange={handleValueChange}
+                    onDismiss={handleDismiss}
+                  />
+                </View>
+              )}
 
             <View style={styles.modalActionRow}>
               <TouchableOpacity
