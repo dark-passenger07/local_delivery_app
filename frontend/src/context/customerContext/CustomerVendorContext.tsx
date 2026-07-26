@@ -1,5 +1,4 @@
 import { create } from "zustand"
-import {io, Socket} from "socket.io-client"
 import { axiosInstance } from "../../api/axios"
 import { useCustomerHomeContext } from "./CustomerHomeContext"
 
@@ -21,6 +20,7 @@ interface VendorProductsTypes {
   productName: string
   description: string
   vendor: VendorType
+  unit: string
 }
 
 interface VendorProfileState {
@@ -37,11 +37,13 @@ interface VendorProfileApiResponse {
 }
 
 interface CustomerVendorState {
+
   vendorProducts: VendorProductsTypes[]
   vendorProfiles: VendorProfileState[]
   getAllVendorProducts: (vendorId: string) => Promise<void>
   getAllVendorProfile: () => Promise<void>
   subscribeProduct: (id: string, dailyQuantity: string, startDate: string) => Promise<void>
+  updateVendorProducts: (newProduct: VendorProductsTypes) => void
   clearVendorProducts: () => void;
 }
 
@@ -54,6 +56,8 @@ interface VendorProductApiResponse {
 export const useCustomerVendorStore = create<CustomerVendorState>()((set,get) => ({
   vendorProducts: [],
   vendorProfiles: [],
+
+
   getAllVendorProducts: async (vendorId: string) => {
     try {
       const res = await axiosInstance.get<VendorProductApiResponse>(`/product/vendor-products/${vendorId}`);
@@ -90,5 +94,19 @@ export const useCustomerVendorStore = create<CustomerVendorState>()((set,get) =>
       const message = error?.response?.data?.message ?? error?.response?.data?.error ?? error.message ?? "Something went wrong";
       throw new Error(message);
     }
+  },
+  updateVendorProducts: (newProduct: VendorProductsTypes) =>{
+    try {
+      set((state)=>{
+        const exists = state.vendorProducts.some((p) => p.id === newProduct.id);
+        return {
+          vendorProducts: exists? state.vendorProducts : [newProduct, ...state.vendorProducts]
+        } 
+      })
+    } catch (error: any) {
+      const message = error?.response?.data?.message ?? error?.response?.data?.error ?? error.message ?? "Something went wrong";
+      throw new Error(message);
+    }
   }
+
 }))

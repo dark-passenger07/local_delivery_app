@@ -6,7 +6,8 @@ import CustomerTabNavigator from "./CustomerNavigator";
 import VendorTabNavigator from "./VendorNavigator";
 import VendorSetUpScreen from "../screens/vendor/VendorSetUpScreen";
 import { useVendorContextStore } from "../context/vendorContext/VendorContext";
-import { useCustomerHomeContext } from "../context/customerContext/CustomerHomeContext";
+
+import { useSocketStore } from "../context/websocket/WebSocketStore";
 
 export default function RootNavigator() {
   const user = useAuthStore((state) => state.user);
@@ -31,7 +32,7 @@ export default function RootNavigator() {
 
       if (user.role !== "VENDOR") {
         resetVendorProfile();
-        useCustomerHomeContext.getState().initCustomerSocket(user.id)
+        useSocketStore.getState().initCustomerSocket(user.id)
         setIsLoading(false);
         return;
       }

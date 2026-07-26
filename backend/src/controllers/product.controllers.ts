@@ -34,7 +34,24 @@ export const addProduct = async (req: Request, res: Response) => {
         description,
         productName,
         unit
+      },
+      include:{
+        vendor: true
       }
+    })
+
+    // vendor customer
+    const customerIds = await db.vendorCustomers.findMany({
+      where:{
+        vendorId: vendor.id
+      },
+      select:{
+        customerId: true
+      }
+    })
+    console.log("Customers id: ",customerIds)
+    customerIds.forEach((customer) =>{
+      req.io.to(customer.customerId).emit("Updated_Product_response", newProduct)
     })
 
     if (!newProduct) {
