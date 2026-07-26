@@ -45,6 +45,7 @@ interface CustomerVendorState {
   subscribeProduct: (id: string, dailyQuantity: string, startDate: string) => Promise<void>
   updateVendorProducts: (newProduct: VendorProductsTypes) => void
   clearVendorProducts: () => void;
+  updateProductAfterDelete: (id: string) => void
 }
 
 interface VendorProductApiResponse {
@@ -107,6 +108,9 @@ export const useCustomerVendorStore = create<CustomerVendorState>()((set,get) =>
       const message = error?.response?.data?.message ?? error?.response?.data?.error ?? error.message ?? "Something went wrong";
       throw new Error(message);
     }
-  }
+  },
+  updateProductAfterDelete: (productId) => set((state) =>({
+    vendorProducts: state.vendorProducts.filter((product) => product.id != productId)
+  }))
 
 }))

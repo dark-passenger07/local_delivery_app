@@ -80,5 +80,6 @@ export const useProductStore = create<ProductState>()((set, get) => ({
         "Failed to fetch products";
       throw new Error(message);
     }
-  }
+  },
+  
 }))

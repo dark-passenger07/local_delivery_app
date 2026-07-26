@@ -225,7 +225,7 @@ export const vendorResponse = async (req: Request, res: Response) => {
         success: false,
       })
     }
-
+    console.log("UpdatedRequest: ", updatedRequest)
     const userId = request.vendorCustomers.user.id
     if (userId) {
       req.io.to(userId).emit("vendor_update_response", updatedRequest)
