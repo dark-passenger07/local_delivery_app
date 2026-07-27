@@ -12,11 +12,13 @@ import {
   Platform,
   Dimensions,
   Linking,
-  ScrollView
+  ScrollView,
+  Image
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker, { DateTimePickerChangeEvent } from "@react-native-community/datetimepicker";
 import { useCustomerHomeContext } from "../../context/customerContext/CustomerHomeContext";
+import { useAuthStore } from "../../context/vendorContext/AuthContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const BASE_WIDTH = 375;
@@ -30,6 +32,16 @@ const REQUEST_TYPES = [
 ];
 
 export default function HomeScreen() {
+  const { user } = useAuthStore();
+  const customerName = user?.name?.split(" ")[0] || "there";
+
+  const getGreeting = (): string => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
+
   const {
     getCustomerSubscribedProducts,
     customerRequest,
@@ -273,11 +285,31 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Services</Text>
-        <Text style={styles.headerSubtitle}>
-          You have {subcribedProducts.length} active {subcribedProducts.length === 1 ? "service" : "services"}
-        </Text>
+      <View style={styles.headerSection}>
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerIconCircle}>
+            <Text style={styles.headerIcon}>👋</Text>
+          </View>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.greetingText}>
+              {getGreeting()}, <Text style={styles.customerNameText}>{customerName}</Text>
+            </Text>
+            <Text style={styles.headerTitle}>Your Services</Text>
+          </View>
+          <Image source={require("../../assets/helpinghandslogo.png")} style={styles.headerLogo} />
+        </View>
+        <View style={styles.headerBadgeRow}>
+          <View style={styles.headerBadge}>
+            <Text style={styles.headerBadgeIcon}>📦</Text>
+            <Text style={styles.headerBadgeText}>
+              {subcribedProducts.length} {subcribedProducts.length === 1 ? "Service" : "Services"}
+            </Text>
+          </View>
+          <View style={styles.headerBadge}>
+            <Text style={styles.headerBadgeIcon}>⚡</Text>
+            <Text style={styles.headerBadgeText}>Delivering Daily</Text>
+          </View>
+        </View>
       </View>
 
       <FlatList
@@ -496,9 +528,60 @@ const styles = StyleSheet.create({
   centerContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F4F6FB" },
   loadingText: { marginTop: 12 * scale, color: "#4B5563", fontSize: 16 * scale, fontWeight: "600" },
 
-  header: { paddingHorizontal: 20 * scale, paddingTop: 12 * scale, paddingBottom: 18 * scale },
-  headerTitle: { fontSize: 30 * scale, fontWeight: "800", color: "#0F172A", letterSpacing: -0.5 * scale },
-  headerSubtitle: { fontSize: 16 * scale, color: "#475569", marginTop: 4 * scale, fontWeight: "600" },
+  headerSection: {
+    paddingHorizontal: 20 * scale,
+    paddingTop: 8 * scale,
+    paddingBottom: 20 * scale
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16 * scale
+  },
+  headerIconCircle: {
+    width: 52 * scale,
+    height: 52 * scale,
+    borderRadius: 26 * scale,
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14 * scale,
+    borderWidth: 2,
+    borderColor: "#E0E7FF"
+  },
+  headerIcon: { fontSize: 28 * scale },
+  headerLogo: { width: 40 * scale, height: 40 * scale, resizeMode: "contain" },
+  headerTextContainer: { flex: 1 },
+  greetingText: { fontSize: 16 * scale, color: "#64748B", fontWeight: "600" },
+  customerNameText: { color: "#2563EB", fontWeight: "800" },
+  headerTitle: {
+    fontSize: 28 * scale,
+    fontWeight: "800",
+    color: "#0F172A",
+    letterSpacing: -0.5 * scale,
+    marginTop: 2 * scale
+  },
+  headerBadgeRow: {
+    flexDirection: "row",
+    gap: 10 * scale
+  },
+  headerBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14 * scale,
+    paddingVertical: 10 * scale,
+    borderRadius: 14 * scale,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  headerBadgeIcon: { fontSize: 18 * scale, marginRight: 6 * scale },
+  headerBadgeText: { fontSize: 13 * scale, fontWeight: "700", color: "#334155" },
 
   listContent: { paddingHorizontal: 20 * scale, paddingBottom: 24 * scale, flexGrow: 1 },
 

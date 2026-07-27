@@ -14,15 +14,24 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerChangeEvent } from '@react-native-community/datetimepicker';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { useCustomerVendorStore } from '../../context/customerContext/CustomerVendorContext';
+import { useCustomerHomeContext } from '../../context/customerContext/CustomerHomeContext';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 
-interface ProductScreenProps {
-  vendorId: string;
-  onBack: () => void;
+type ProductScreenRouteParams = {
+  ProductScreen: {
+    vendorId: string
+  }
 }
 
-const ProductScreen = ({ vendorId, onBack }: ProductScreenProps) => {
+const ProductScreen = () => {
+  const route = useRoute<RouteProp<ProductScreenRouteParams, 'ProductScreen'>>();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const { vendorId } = route.params;
   const { getAllVendorProducts, vendorProducts, clearVendorProducts, subscribeProduct } = useCustomerVendorStore();
+  const { getCustomerSubscribedProducts, subcribedProducts } = useCustomerHomeContext();
 
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -36,11 +45,14 @@ const ProductScreen = ({ vendorId, onBack }: ProductScreenProps) => {
   const [startDateObj, setStartDateObj] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  useEffect(() => {
+   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        await getAllVendorProducts(vendorId);
+        await Promise.all([
+          getAllVendorProducts(vendorId),
+          getCustomerSubscribedProducts()
+        ]);
       } catch (error: any) {
         Alert.alert('Error', error.message || 'Failed to load products');
       } finally {
@@ -53,6 +65,10 @@ const ProductScreen = ({ vendorId, onBack }: ProductScreenProps) => {
       clearVendorProducts();
     };
   }, [vendorId]);
+
+  useEffect(() => {
+    setSubscribedIds(new Set(subcribedProducts.map(p => p.id)));
+  }, [subcribedProducts]);
 
   const getInitials = (name: string): string => {
     if (!name) return '?';
@@ -146,8 +162,10 @@ const ProductScreen = ({ vendorId, onBack }: ProductScreenProps) => {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton} activeOpacity={0.7}>
-          <Text style={styles.backButtonIcon}>←</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} activeOpacity={0.7}>
+          <View style={styles.backButtonIconWrap}>
+            <Text style={styles.backButtonIcon}>←</Text>
+          </View>
           <Text style={styles.backButtonText}>Vendors</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Products</Text>
@@ -212,11 +230,17 @@ const ProductScreen = ({ vendorId, onBack }: ProductScreenProps) => {
             </View>
             <Text style={styles.modalTitle}>Confirm Subscription</Text>
             <Text style={styles.modalMessage}>
-              Are you sure you want to subscribe to{' '}
-              <Text style={styles.modalMessageBold}>{activeProduct?.productName}</Text>?
-            </Text>
+               Are you sure you want to subscribe to{' '}
+               <Text style={styles.modalMessageBold}>{activeProduct?.productName}</Text>?
+             </Text>
 
-            <View style={styles.formField}>
+             {activeProduct?.unit && (
+               <View style={styles.unitBadge}>
+                 <Text style={styles.unitText}>{activeProduct.unit}</Text>
+               </View>
+             )}
+
+             <View style={styles.formField}>
               <Text style={styles.formLabel}>Daily Quantity</Text>
               <TextInput
                 style={styles.formInput}
@@ -283,10 +307,33 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F6FA' },
   loadingText: { marginTop: 12, color: '#6B7280', fontSize: 14, fontWeight: '500' },
 
-  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
-  backButton: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 10 },
-  backButtonIcon: { fontSize: 16, color: '#6366F1', marginRight: 4, fontWeight: '700' },
-  backButtonText: { color: '#6366F1', fontSize: 15, fontWeight: '600' },
+  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, backgroundColor: '#FFFFFF' },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F0FF',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 25,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+  },
+  backButtonIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  backButtonIcon: { fontSize: 16, color: '#6366F1', fontWeight: '700' },
+  backButtonText: { color: '#6366F1', fontSize: 14, fontWeight: '700' },
   headerTitle: { fontSize: 26, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
   headerSubtitle: { fontSize: 14, color: '#6B7280', marginTop: 2, fontWeight: '500' },
 
@@ -411,7 +458,18 @@ const styles = StyleSheet.create({
   },
   datePickerIcon: { fontSize: 16 },
   dateText: { fontSize: 15, color: '#111827', fontWeight: '700' },
-  placeholderText: { fontSize: 14, color: '#9CA3AF', fontWeight: '600' }
-});
+   placeholderText: { fontSize: 14, color: '#9CA3AF', fontWeight: '600' },
+
+   unitBadge: {
+     alignSelf: 'center',
+     backgroundColor: '#EEF0FB',
+     paddingHorizontal: 12,
+     paddingVertical: 4,
+     borderRadius: 8,
+     marginBottom: 16,
+     marginTop: 4
+   },
+   unitText: { fontSize: 13, fontWeight: '700', color: '#6366F1' }
+ });
 
 export default ProductScreen;

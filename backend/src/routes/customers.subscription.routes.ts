@@ -18,9 +18,13 @@ import { isVendor } from "../middlewares/isVendor.js"
 const customerSubscriptionRouter = express.Router()
 
 customerSubscriptionRouter.post("/product/add/:id", isAuthenticated, isRoleCustomer, subscribeProduct)
+
 customerSubscriptionRouter.delete("/product/unsubscribe-product/:id", isAuthenticated, isRoleCustomer, unsubscribeProduct)
+
 customerSubscriptionRouter.get("/get/subscribed-product", isAuthenticated, isRoleCustomer, customerSubscribedProduct)
+
 customerSubscriptionRouter.get("/get/customer-subcribed-product", isAuthenticated, isCreatedVendorProfile, isVendor, vendorSubscibedProducts)
+
 customerSubscriptionRouter.get("/get/vendor/customer-subscriptions/:customerId", isAuthenticated, isCreatedVendorProfile, isVendor, getVendorCustomerSubscriptions)
 
 // get the subscription states of the customer

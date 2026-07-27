@@ -72,20 +72,20 @@ export default function RequestsScreen() {
     if (normalized === "APPROVED" || normalized === "ACCEPTED") {
       return (
         <View style={[styles.statusPill, styles.statusPillAccepted]}>
-          <Text style={styles.statusPillTextAccepted}>✅ Accepted</Text>
+          <Text style={styles.statusPillTextAccepted}>✓ Accepted</Text>
         </View>
       );
     }
     if (normalized === "REJECTED" || normalized === "DECLINED") {
       return (
         <View style={[styles.statusPill, styles.statusPillRejected]}>
-          <Text style={styles.statusPillTextRejected}>✕ Rejected</Text>
+          <Text style={styles.statusPillTextRejected}>✗ Rejected</Text>
         </View>
       );
     }
     return (
       <View style={[styles.statusPill, styles.statusPillPending]}>
-        <Text style={styles.statusPillTextPending}>🕓 Waiting</Text>
+        <Text style={styles.statusPillTextPending}>⏳ Waiting</Text>
       </View>
     );
   };
@@ -161,26 +161,26 @@ export default function RequestsScreen() {
       </View>
 
       {/* Dynamic Tab Navigation Menu */}
-      <View style={styles.tabBar}>
-        {TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tab, activeTab === tab.key && styles.activeTab]}
-            onPress={() => setActiveTab(tab.key)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.tabIcon}>{tab.icon}</Text>
-            <Text style={[styles.tabLabel, activeTab === tab.key && styles.activeTabLabel]}>
-              {tab.label}
-            </Text>
-            <View style={[styles.tabCount, activeTab === tab.key && styles.activeTabCount]}>
-              <Text style={[styles.tabCountText, activeTab === tab.key && styles.activeTabCountText]}>
-                {categorizedRequests[tab.key].length}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
+       <View style={styles.tabBar}>
+         {TABS.map((tab) => (
+           <TouchableOpacity
+             key={tab.key}
+             style={[styles.tab, activeTab === tab.key && styles.activeTab]}
+             onPress={() => setActiveTab(tab.key)}
+             activeOpacity={0.8}
+           >
+             <Text style={styles.tabIcon}>{tab.icon}</Text>
+             <Text style={[styles.tabLabel, activeTab === tab.key && styles.activeTabLabel]}>
+               {tab.label}
+             </Text>
+             <View style={[styles.tabCount, activeTab === tab.key && styles.activeTabCount]}>
+               <Text style={[styles.tabCountText, activeTab === tab.key && styles.activeTabCountText]}>
+                 {categorizedRequests[tab.key].length}
+               </Text>
+             </View>
+           </TouchableOpacity>
+         ))}
+       </View>
 
       {/* Requests Feed */}
       <FlatList
@@ -260,63 +260,64 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     letterSpacing: -0.5,
   },
-  tabBar: {
-    flexDirection: "row",
-    backgroundColor: "#FFF",
-    marginHorizontal: 20,
-    borderRadius: 16,
-    padding: 6,
-    marginBottom: 8,
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 1,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: "row",
-    paddingVertical: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 12,
-    gap: 5,
-  },
-  activeTab: {
-    backgroundColor: "#DBEAFE",
-  },
-  tabIcon: {
-    fontSize: 13,
-  },
-  tabLabel: {
-    fontSize: 13,
-    color: "#64748B",
-    fontWeight: "700",
-  },
-  activeTabLabel: {
-    color: "#1D4ED8",
-    fontWeight: "800",
-  },
-  tabCount: {
-    backgroundColor: "#F1F5F9",
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 5,
-  },
-  activeTabCount: {
-    backgroundColor: "#2563EB",
-  },
-  tabCountText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#64748B",
-  },
-  activeTabCountText: {
-    color: "#FFFFFF",
-  },
+   tabBar: {
+     flexDirection: "row",
+     backgroundColor: "#FFF",
+     marginHorizontal: 20,
+     borderRadius: 16,
+     padding: 4,
+     marginBottom: 8,
+     shadowColor: "#0F172A",
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.05,
+     shadowRadius: 8,
+     elevation: 1,
+   },
+   tab: {
+     flex: 1,
+     flexDirection: "row",
+     paddingVertical: 8,
+     paddingHorizontal: 6,
+     alignItems: "center",
+     justifyContent: "center",
+     borderRadius: 10,
+     gap: 3,
+   },
+   activeTab: {
+     backgroundColor: "#DBEAFE",
+   },
+   tabIcon: {
+     fontSize: 11,
+   },
+   tabLabel: {
+     fontSize: 11,
+     color: "#64748B",
+     fontWeight: "700",
+   },
+   activeTabLabel: {
+     color: "#1D4ED8",
+     fontWeight: "800",
+   },
+   tabCount: {
+     backgroundColor: "#F1F5F9",
+     borderRadius: 8,
+     minWidth: 16,
+     height: 16,
+     alignItems: "center",
+     justifyContent: "center",
+     paddingHorizontal: 3,
+   },
+   activeTabCount: {
+     backgroundColor: "#2563EB",
+   },
+   tabCountText: {
+     fontSize: 9,
+     fontWeight: "800",
+     color: "#64748B",
+   },
+   activeTabCountText: {
+     color: "#FFFFFF",
+   },
   listContainer: {
     padding: 20,
     paddingBottom: 30,
@@ -345,15 +346,15 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
-  productRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginRight: 8,
-  },
+   productRow: {
+     flexDirection: "row",
+     alignItems: "center",
+     backgroundColor: "#F8FAFC",
+     borderRadius: 10,
+     paddingHorizontal: 10,
+     paddingVertical: 6,
+     flex: 1,
+   },
   productLabel: {
     fontSize: 11,
     fontWeight: "700",
@@ -371,20 +372,20 @@ const styles = StyleSheet.create({
   requestBody: {
     marginTop: 2,
   },
-  typeBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: "#DBEAFE",
-    color: "#1D4ED8",
-    fontSize: 12,
-    fontWeight: "800",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    overflow: "hidden",
-  },
+   typeBadge: {
+     alignSelf: "flex-start",
+     backgroundColor: "#DBEAFE",
+     color: "#1D4ED8",
+     fontSize: 11,
+     fontWeight: "800",
+     paddingHorizontal: 8,
+     paddingVertical: 4,
+     borderRadius: 8,
+     overflow: "hidden",
+   },
   statusPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 20,
   },
   statusPillPending: {
@@ -397,17 +398,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#FEE2E2",
   },
   statusPillTextPending: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
     color: "#B45309",
   },
   statusPillTextAccepted: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
     color: "#15803D",
   },
   statusPillTextRejected: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
     color: "#B91C1C",
   },

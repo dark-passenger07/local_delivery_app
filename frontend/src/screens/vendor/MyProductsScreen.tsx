@@ -11,6 +11,7 @@ import {
   RefreshControl,
   Keyboard,
   TouchableWithoutFeedback,
+  Alert,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Feather } from '@expo/vector-icons'
@@ -160,7 +161,18 @@ export const MyProductsScreen = () => {
 
   const handleDelete = useCallback(
     (id: string) => {
-      removeProduct(id)
+      Alert.alert(
+        'Delete product',
+        'Are you sure you want to delete this product? This action cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => removeProduct(id),
+          },
+        ]
+      )
     },
     [removeProduct]
   )

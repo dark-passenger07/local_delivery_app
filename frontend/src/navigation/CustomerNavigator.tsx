@@ -11,6 +11,7 @@ import { VendorScreen } from '../screens/customer/VendorScreen';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MySubscriptionsScreen from '../screens/customer/MySubscriptionsScreen';
 import SubscriptionCalendarScreen from '../screens/customer/SubscriptionCalendarScreen';
+import ProductScreen from '../screens/customer/ProductScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator()
@@ -20,6 +21,15 @@ function SubscriptionsStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MySubscriptions" component={MySubscriptionsScreen} />
       <Stack.Screen name="SubscriptionCalendar" component={SubscriptionCalendarScreen} />
+    </Stack.Navigator>
+  )
+}
+
+function VendorsStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="VendorScreen" component={VendorScreen} />
+      <Stack.Screen name="ProductScreen" component={ProductScreen} />
     </Stack.Navigator>
   )
 }
@@ -72,7 +82,7 @@ export default function CustomerTabNavigator() {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Vendor" component={VendorScreen} />
+      <Tab.Screen name="Vendor" component={VendorsStack} />
       <Tab.Screen name="Requests" component={RequestsScreen} />
       <Tab.Screen name="Subscriptions" component={SubscriptionsStack} />
       <Tab.Screen name="Profile" component={ProfileScreen} />

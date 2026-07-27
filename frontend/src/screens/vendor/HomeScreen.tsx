@@ -10,11 +10,16 @@ import {
   Pressable,
   Linking,
   Platform,
+  Dimensions,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 import { useCustomerSubscriptionStore } from "../../context/vendorContext/CustomerSubscriptionContex";
 import { useVendorContextStore } from "../../context/vendorContext/VendorContext";
+import { useProductStore } from "../../context/vendorContext/ProductContext";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface CustomerState {
   id: string;
@@ -76,6 +81,7 @@ export default function HomeScreen() {
 
   const { subscribedProducts, subscribedCustomers, error: storeError } = useCustomerSubscriptionStore();
   const { vendorAccount } = useVendorContextStore();
+  const { allProducts } = useProductStore();
 
   const vendorCustomers = useMemo(() => {
     const customerMap = new Map<string, CustomerState>();
@@ -100,11 +106,7 @@ export default function HomeScreen() {
   }, [subscribedProducts]);
 
   const totalSubscriptions = useMemo(() => vendorCustomers.reduce((n, c) => n + c.products.length, 0), [vendorCustomers]);
-  const uniqueProducts = useMemo(() => {
-    const s = new Set<string>();
-    vendorCustomers.forEach((c) => c.products.forEach((p) => s.add(p)));
-    return s.size;
-  }, [vendorCustomers]);
+  const totalProducts = useMemo(() => allProducts.length, [allProducts]);
 
   const activeError = storeError || localError;
 
@@ -152,11 +154,11 @@ export default function HomeScreen() {
           <View style={[styles.avatar, { backgroundColor: av.bg }]}>
             <Text style={[styles.avatarText, { color: av.fg }]}>{(item.name?.[0] || "?").toUpperCase()}</Text>
           </View>
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.customerName} numberOfLines={1}>{item.name}</Text>
+          <View style={styles.cardInfo}>
+            <Text style={styles.customerName} numberOfLines={1} ellipsizeMode="tail">{item.name}</Text>
             <View style={styles.phoneRow}>
               <Ionicons name="call" size={12} color={C.inkSoft} />
-              <Text style={styles.customerPhone}>{formatPhone(item.phone)}</Text>
+              <Text style={styles.customerPhone} numberOfLines={1} ellipsizeMode="tail">{formatPhone(item.phone)}</Text>
             </View>
           </View>
           <Pressable onPress={callCustomer} style={({ pressed }) => [styles.callBtn, pressed && { transform: [{ scale: 0.95 }] }]} hitSlop={8}>
@@ -178,7 +180,7 @@ export default function HomeScreen() {
             return (
               <View key={`${item.id}-${product}-${index}`} style={[styles.badge, { backgroundColor: s.bg }]}>
                 {s.icon}
-                <Text style={[styles.badgeText, { color: s.fg }]} numberOfLines={1}>{product}</Text>
+                <Text style={[styles.badgeText, { color: s.fg }]} numberOfLines={1} ellipsizeMode="tail">{product}</Text>
               </View>
             );
           })}
@@ -188,9 +190,9 @@ export default function HomeScreen() {
           <View style={styles.addressIconWrap}>
             <Ionicons name="location-sharp" size={16} color={C.primary} />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={styles.addressContent}>
             <Text style={styles.addressLabel}>Delivery Address</Text>
-            <Text style={styles.addressValue} numberOfLines={2}>{item.address}</Text>
+            <Text style={styles.addressValue} numberOfLines={2} ellipsizeMode="tail">{item.address}</Text>
           </View>
         </View>
       </View>
@@ -205,6 +207,7 @@ export default function HomeScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.hello}>Namaste 👋</Text>
           <Text style={styles.headerTitle}>Dashboard</Text>
+          <Image source={require("../../assets/helpinghandslogo.png")} style={styles.headerLogo} />
         </View>
         <View style={styles.counterBadge}>
           <MaterialCommunityIcons name="account-group" size={14} color={C.primary} />
@@ -246,7 +249,7 @@ export default function HomeScreen() {
                 <View style={styles.statsRow}>
                   <StatChip icon={<Ionicons name="people" size={18} color={C.primary} />} tone={C.primarySoft} value={String(vendorCustomers.length)} label="Customers" />
                   <StatChip icon={<MaterialCommunityIcons name="package-variant-closed" size={18} color={C.green} />} tone={C.greenSoft} value={String(totalSubscriptions)} label="Active" />
-                  <StatChip icon={<Feather name="box" size={18} color={C.orange} />} tone={C.orangeSoft} value={String(uniqueProducts)} label="Products" />
+                  <StatChip icon={<Feather name="box" size={18} color={C.orange} />} tone={C.orangeSoft} value={String(totalProducts)} label="Products" />
                 </View>
                 <Text style={styles.listSectionTitle}>Your Customers</Text>
               </>
@@ -281,49 +284,52 @@ function StatChip({ icon, tone, value, label }: { icon: React.ReactNode; tone: s
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   headerContainer: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, gap: 10 },
+  headerLogo: { width: 36, height: 36, resizeMode: "contain", marginTop: 6 },
   hello: { fontSize: 13, color: C.inkSoft, fontWeight: "500", marginBottom: 2 },
   headerTitle: { fontSize: 28, fontWeight: "800", color: C.ink, letterSpacing: -0.5 },
   counterBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.primarySoft, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99 },
   counterText: { fontSize: 12.5, fontWeight: "700", color: C.primary },
 
-  statsRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
-  statChip: {
-    flex: 1, backgroundColor: C.card, borderRadius: 16, padding: 12, flexDirection: "row", alignItems: "center",
-    ...Platform.select({ ios: { shadowColor: "#0F172A", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10 }, android: { elevation: 1 } }),
-  },
-  statIconWrap: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center" },
-  statValue: { fontSize: 17, fontWeight: "800", color: C.ink, lineHeight: 19 },
-  statLabel: { fontSize: 11, color: C.inkSoft, marginTop: 2, fontWeight: "600" },
-  listSectionTitle: { fontSize: 15, fontWeight: "700", color: C.ink, marginBottom: 12, letterSpacing: -0.2 },
+   statsRow: { flexDirection: "row", gap: 8, marginBottom: 16, flexWrap: "wrap" },
+   statChip: {
+     flex: 1, minWidth: "30%", backgroundColor: C.card, borderRadius: 16, padding: 10, flexDirection: "row", alignItems: "center",
+     ...Platform.select({ ios: { shadowColor: "#0F172A", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10 }, android: { elevation: 1 } }),
+   },
+   statIconWrap: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+   statValue: { fontSize: 15, fontWeight: "800", color: C.ink, lineHeight: 17 },
+   statLabel: { fontSize: 10.5, color: C.inkSoft, marginTop: 1, fontWeight: "600" },
+   listSectionTitle: { fontSize: 14, fontWeight: "700", color: C.ink, marginBottom: 10, letterSpacing: -0.2 },
 
-  listContainer: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 4 },
-  card: {
-    backgroundColor: C.card, borderRadius: 22, padding: 18, marginBottom: 14,
-    ...Platform.select({ ios: { shadowColor: "#0F172A", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16 }, android: { elevation: 2 } }),
-  },
-  cardTopRow: { flexDirection: "row", alignItems: "center" },
-  avatar: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  avatarText: { fontSize: 20, fontWeight: "800" },
-  customerName: { fontSize: 18, fontWeight: "800", color: C.ink, letterSpacing: -0.3, textTransform: "capitalize" },
-  phoneRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
-  customerPhone: { fontSize: 13.5, color: C.inkSoft, fontWeight: "600", letterSpacing: 0.3 },
-  callBtn: {
-    width: 42, height: 42, borderRadius: 21, backgroundColor: C.green, alignItems: "center", justifyContent: "center",
-    ...Platform.select({ ios: { shadowColor: C.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }, android: { elevation: 3 } }),
-  },
+   listContainer: { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 4 },
+   card: {
+     backgroundColor: C.card, borderRadius: 22, padding: 14, marginBottom: 12, overflow: "hidden",
+     ...Platform.select({ ios: { shadowColor: "#0F172A", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16 }, android: { elevation: 2 } }),
+   },
+   cardTopRow: { flexDirection: "row", alignItems: "center" },
+   cardInfo: { flex: 1, marginLeft: 12, minWidth: 0 },
+   avatar: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+   avatarText: { fontSize: 18, fontWeight: "800" },
+   customerName: { fontSize: 16, fontWeight: "800", color: C.ink, letterSpacing: -0.3, textTransform: "capitalize" },
+   phoneRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+   customerPhone: { fontSize: 12.5, color: C.inkSoft, fontWeight: "600", letterSpacing: 0.3 },
+   callBtn: {
+     width: 38, height: 38, borderRadius: 19, backgroundColor: C.green, alignItems: "center", justifyContent: "center",
+     ...Platform.select({ ios: { shadowColor: C.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }, android: { elevation: 3 } }),
+   },
 
-  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 16, marginBottom: 10 },
-  sectionLabel: { fontSize: 11, fontWeight: "700", color: C.inkMuted, letterSpacing: 1.1 },
-  countBubble: { marginLeft: 2, minWidth: 20, height: 20, paddingHorizontal: 6, borderRadius: 10, backgroundColor: C.primarySoft, alignItems: "center", justifyContent: "center" },
-  countBubbleText: { color: C.primary, fontSize: 11, fontWeight: "800" },
-  badgesContainer: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  badge: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
-  badgeText: { fontSize: 12.5, fontWeight: "700" },
+   sectionHeader: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 12, marginBottom: 8 },
+   sectionLabel: { fontSize: 10.5, fontWeight: "700", color: C.inkMuted, letterSpacing: 1 },
+   countBubble: { marginLeft: 2, minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: C.primarySoft, alignItems: "center", justifyContent: "center" },
+   countBubbleText: { color: C.primary, fontSize: 10, fontWeight: "800" },
+   badgesContainer: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+   badge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 99, maxWidth: "100%" },
+   badgeText: { fontSize: 11.5, fontWeight: "700" },
 
-  addressContainer: { marginTop: 14, backgroundColor: C.addressBg, borderRadius: 14, padding: 12, flexDirection: "row", alignItems: "center", gap: 12 },
-  addressIconWrap: { width: 34, height: 34, borderRadius: 11, backgroundColor: C.primarySoft, alignItems: "center", justifyContent: "center" },
-  addressLabel: { fontSize: 11, fontWeight: "700", color: C.inkMuted, letterSpacing: 0.5, marginBottom: 2 },
-  addressValue: { fontSize: 14, color: C.ink, fontWeight: "600", lineHeight: 18 },
+   addressContainer: { marginTop: 10, backgroundColor: C.addressBg, borderRadius: 12, padding: 10, flexDirection: "row", alignItems: "center", gap: 10 },
+   addressIconWrap: { width: 30, height: 30, borderRadius: 10, backgroundColor: C.primarySoft, alignItems: "center", justifyContent: "center" },
+   addressContent: { flex: 1, minWidth: 0 },
+   addressLabel: { fontSize: 10.5, fontWeight: "700", color: C.inkMuted, letterSpacing: 0.5, marginBottom: 1 },
+   addressValue: { fontSize: 13, color: C.ink, fontWeight: "600", lineHeight: 16 },
 
   centerContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 40, minHeight: 320 },
   loadingText: { marginTop: 12, color: C.inkSoft, fontSize: 14, fontWeight: "500" },

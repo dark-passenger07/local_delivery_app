@@ -225,26 +225,26 @@ const RequestsScreen = () => {
       </View>
 
       {/* Tab Navigation Menu */}
-      <View style={styles.tabBar}>
-        {TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tab, activeTab === tab.key && styles.activeTab]}
-            onPress={() => setActiveTab(tab.key)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.tabIcon}>{tab.icon}</Text>
-            <Text style={[styles.tabLabel, activeTab === tab.key && styles.activeTabLabel]}>
-              {tab.label}
-            </Text>
-            <View style={[styles.tabCount, activeTab === tab.key && styles.activeTabCount]}>
-              <Text style={[styles.tabCountText, activeTab === tab.key && styles.activeTabCountText]}>
-                {categorizedRequests[tab.key].length}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
+       <View style={styles.tabBar}>
+         {TABS.map((tab) => (
+           <TouchableOpacity
+             key={tab.key}
+             style={[styles.tab, activeTab === tab.key && styles.activeTab]}
+             onPress={() => setActiveTab(tab.key)}
+             activeOpacity={0.8}
+           >
+             <Text style={styles.tabIcon}>{tab.icon}</Text>
+             <Text style={[styles.tabLabel, activeTab === tab.key && styles.activeTabLabel]}>
+               {tab.label}
+             </Text>
+             <View style={[styles.tabCount, activeTab === tab.key && styles.activeTabCount]}>
+               <Text style={[styles.tabCountText, activeTab === tab.key && styles.activeTabCountText]}>
+                 {categorizedRequests[tab.key].length}
+               </Text>
+             </View>
+           </TouchableOpacity>
+         ))}
+       </View>
 
       {/* Requests Feed */}
       <FlatList
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     marginHorizontal: 20,
     borderRadius: 16,
-    padding: 6,
+    padding: 4,
     marginBottom: 8,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
@@ -341,20 +341,21 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     flexDirection: 'row',
-    paddingVertical: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    gap: 5,
+    borderRadius: 10,
+    gap: 3,
   },
   activeTab: {
     backgroundColor: '#DBEAFE',
   },
   tabIcon: {
-    fontSize: 13,
+    fontSize: 11,
   },
   tabLabel: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#64748B',
     fontWeight: '700',
   },
@@ -364,18 +365,18 @@ const styles = StyleSheet.create({
   },
   tabCount: {
     backgroundColor: '#F1F5F9',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 5,
+    paddingHorizontal: 3,
   },
   activeTabCount: {
     backgroundColor: '#2563EB',
   },
   tabCountText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '800',
     color: '#64748B',
   },
@@ -407,28 +408,29 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     marginBottom: 14,
   },
-  productRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
-  },
-  productLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748B',
-    marginRight: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  productName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-    flex: 1,
-  },
+   productRow: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     backgroundColor: '#F8FAFC',
+     borderRadius: 10,
+     padding: 8,
+     marginBottom: 10,
+     flexWrap: 'wrap',
+     gap: 6,
+   },
+   productLabel: {
+     fontSize: 11,
+     fontWeight: '700',
+     color: '#64748B',
+     textTransform: 'uppercase',
+     letterSpacing: 0.3,
+   },
+   productName: {
+     fontSize: 13,
+     fontWeight: '700',
+     color: '#0F172A',
+     flex: 1,
+   },
   avatarCircle: {
     width: 44,
     height: 44,
@@ -474,32 +476,31 @@ const styles = StyleSheet.create({
   requestDetails: {
     marginTop: 2,
   },
-  typeBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#DBEAFE',
-    color: '#1D4ED8',
-    fontSize: 12,
-    fontWeight: '800',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  quantityBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginBottom: 10,
-    marginLeft: 8,
-  },
-  quantityBadgeText: {
-    color: '#92400E',
-    fontSize: 12,
-    fontWeight: '800',
-  },
+   typeBadge: {
+     alignSelf: 'flex-start',
+     backgroundColor: '#DBEAFE',
+     color: '#1D4ED8',
+     fontSize: 11,
+     fontWeight: '800',
+     paddingHorizontal: 8,
+     paddingVertical: 4,
+     borderRadius: 8,
+     overflow: 'hidden',
+     marginBottom: 10,
+   },
+   quantityBadge: {
+     alignSelf: 'flex-start',
+     backgroundColor: '#FEF3C7',
+     paddingHorizontal: 8,
+     paddingVertical: 4,
+     borderRadius: 8,
+     marginBottom: 10,
+   },
+   quantityBadgeText: {
+     color: '#92400E',
+     fontSize: 11,
+     fontWeight: '800',
+   },
   messageBox: {
     backgroundColor: '#F8FAFC',
     borderRadius: 12,

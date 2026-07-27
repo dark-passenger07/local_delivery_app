@@ -34,7 +34,7 @@ export const addCustomers = async (req: Request, res: Response) => {
       })
     }
 
-    if(user.role === "VENDOR"){
+    if (user.role === "VENDOR") {
       return res.status(400).json({
         message: "You can not add vendor profile as your customer!",
         success: false,
@@ -51,7 +51,7 @@ export const addCustomers = async (req: Request, res: Response) => {
     // check if the user is already a customer of the vendor or not
     const isCustomer = await db.vendorCustomers.findUnique({
       where: {
-        vendorId_customerId:{
+        vendorId_customerId: {
           vendorId: vendorId,
           customerId: user.id
         }
@@ -70,8 +70,8 @@ export const addCustomers = async (req: Request, res: Response) => {
         customerPhone,
         customerId: user.id
       },
-      include:{
-        vendor: true
+      include: {
+        vendor: true,
       }
     })
 
@@ -82,8 +82,8 @@ export const addCustomers = async (req: Request, res: Response) => {
       })
     }
     const vendorProfile = newCustomer.vendor
-    console.log("newCustomer response: ", newCustomer)
-    req.io.to(user.id).emit("vendor_added_customer", vendorProfile )
+
+    req.io.to(user.id).emit("vendor_added_customer", vendorProfile)
 
     return res.status(200).json({
       message: "Customer added successfully!",
@@ -118,6 +118,22 @@ export const removeCustomer = async (req: Request, res: Response) => {
         success: false
       })
     }
+    const isCustomer = await db.vendorCustomers.findUnique({
+      where: {
+        vendorId_customerId: {
+          vendorId: vendorId,
+          customerId: customer.id
+        }
+      }
+    })
+
+    if (!isCustomer) {
+      return res.status(400).json({
+        message: "Sorry! This user is not your customer",
+        success: false
+      })
+    }
+
     await db.vendorCustomers.delete(
       {
         where: {
@@ -130,7 +146,10 @@ export const removeCustomer = async (req: Request, res: Response) => {
     )
 
     // update the customer instantly after getting removed
-    req.io.to(customer.id).emit("customer_removed" ,vendorId)
+    req.io.to(customer.id).emit("customer_removed", {
+      vendorId: vendorId,
+    }
+    )
 
     return res.status(200).json({
       message: "Customer removed successfully!",

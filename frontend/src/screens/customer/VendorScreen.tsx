@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, Linking, RefreshControl } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCustomerVendorStore } from '../../context/customerContext/CustomerVendorContext';
-import ProductScreen from './ProductScreen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export const VendorScreen = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { getAllVendorProfile, vendorProfiles } = useCustomerVendorStore();
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [isViewingProducts, setIsViewingProducts] = useState<boolean>(false);
-  const [vendorId, setVendorId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchVendors = async () => {
@@ -34,7 +34,6 @@ export const VendorScreen = () => {
       setRefreshing(false);
     }
   };
-
 
   const getInitials = (name: string): string => {
     if (!name) return '?';
@@ -65,22 +64,8 @@ export const VendorScreen = () => {
   };
 
   const handleViewProducts = (id: string) => {
-    setVendorId(id);
-    setIsViewingProducts(true);
+    navigation.navigate('ProductScreen', { vendorId: id });
   };
-
-  // Show the product screen if a vendor profile was clicked
-  if (isViewingProducts && vendorId) {
-    return (
-      <ProductScreen
-        vendorId={vendorId}
-        onBack={() => {
-          setIsViewingProducts(false);
-          setVendorId(null);
-        }}
-      />
-    );
-  }
 
   if (loading) {
     return (
