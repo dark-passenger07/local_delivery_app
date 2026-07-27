@@ -4,7 +4,7 @@ import { useCustomerHomeContext } from "../customerContext/CustomerHomeContext";
 
 import { useCustomerVendorStore, VendorType } from "../customerContext/CustomerVendorContext";
 import { useRequestStore } from "../vendorContext/RequestContext";
-
+import { useCustomerSubscriptionStore } from "../vendorContext/CustomerSubscriptionContex";
 interface SocketStore{
   initCustomerSocket: (userId: string) => Promise<void>
   socket: Socket | null
@@ -87,19 +87,23 @@ export const useSocketStore = create<SocketStore>()((set, get) =>({
 
     socket.on("connect_error", (err) => console.log("Socket error: ", err.message))
 
+    // show the customer vendor's updated product list
     socket.on("Updated_Product_response", (newProduct: newProductType) =>{
       useCustomerVendorStore.getState().updateVendorProducts(newProduct)
     })  
 
+    // show the vendor response to customer request instantly
     socket.on("vendor_update_response", (updatedRequest: Request)=>{
       useCustomerHomeContext.getState().updateRequestDetails(updatedRequest)
     })
 
+    // when there is a new request update the vendor request section instantly
     socket.on("new_request_created", (newRequest: CustomerRequest) =>{
       const mappedRequest = {...newRequest,productName: newRequest.product?.productName}
       useRequestStore.getState().getNewRequest(mappedRequest)
     })
 
+    // update the customer when vendor deletes their product
     socket.on("update_vendor_product",(data) =>{
       const {action, productId} = data;
       if(action == "DELETE"){
@@ -108,17 +112,39 @@ export const useSocketStore = create<SocketStore>()((set, get) =>({
       }
     })
 
-    // remaining :-
-    // when customer adds a product
-    // when customer removes a product
-    // when vendor adds a customer 
+    // when customer subscribes to a product update it to vendor instantly
+    socket.on("customer_subscribed_product",(newSubscription) =>{
+      useCustomerSubscriptionStore.setState((state)=> ({
+        subscribedProducts: [newSubscription, ...state.subscribedProducts]
+      }))
+    })
     
+    // when customer removes a product update it to vendor instantly
+    socket.on("customer_unsubcribed_product", (productId) =>{
+      useCustomerSubscriptionStore.setState((state) =>({
+        subscribedProducts: state.subscribedProducts.filter((p) => p?.productId != productId)
+      }))
+    })    
+    
+    // when vendor adds a customer 
+    socket.on("vendor_added_customer",(newVendor) =>{
+      useCustomerVendorStore.setState((state) =>({
+        vendorProfiles: [newVendor, ...state.vendorProfiles]
+      }));
+    })
 
+    // when vendor removes the customer
+    socket.on("customer_removed",(vendorId) =>{
+      useCustomerVendorStore.setState((state) =>({
+        vendorProfiles: state.vendorProfiles.filter((vendor) => vendor.id != vendorId)
+      }));
+    })
 
 
 
     set({ socket });
   },
+
   disconnectSocket: async () => {
     const { socket } = get();
 
@@ -127,6 +153,11 @@ export const useSocketStore = create<SocketStore>()((set, get) =>({
       socket.off("connect_error");
       socket.off("new_request_created");
       socket.off("Updated_Product_response");
+      socket.off("vendor_update_response");
+      socket.off("update_vendor_product");
+      socket.off("customer_subscribed_product");
+      socket.off("customer_unsubcribed_product");
+      socket.off("vendor_added_customer");
 
       socket.disconnect(); // Closes the connection cleanly
       set({ socket: null }); // Resets the store state

@@ -69,6 +69,9 @@ export const addCustomers = async (req: Request, res: Response) => {
         vendorId,
         customerPhone,
         customerId: user.id
+      },
+      include:{
+        vendor: true
       }
     })
 
@@ -78,6 +81,10 @@ export const addCustomers = async (req: Request, res: Response) => {
         success: false
       })
     }
+    const vendorProfile = newCustomer.vendor
+    console.log("newCustomer response: ", newCustomer)
+    req.io.to(user.id).emit("vendor_added_customer", vendorProfile )
+
     return res.status(200).json({
       message: "Customer added successfully!",
       success: true,
@@ -121,6 +128,9 @@ export const removeCustomer = async (req: Request, res: Response) => {
         }
       }
     )
+
+    // update the customer instantly after getting removed
+    req.io.to(customer.id).emit("customer_removed" ,vendorId)
 
     return res.status(200).json({
       message: "Customer removed successfully!",

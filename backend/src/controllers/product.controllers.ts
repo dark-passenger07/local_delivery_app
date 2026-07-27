@@ -49,7 +49,6 @@ export const addProduct = async (req: Request, res: Response) => {
         customerId: true
       }
     })
-    console.log("Customers id: ",customerIds)
     customerIds.forEach((customer) =>{
       req.io.to(customer.customerId).emit("Updated_Product_response", newProduct)
     })
@@ -117,8 +116,6 @@ export const removeProduct = async (req: Request, res: Response) => {
         customerId: true
       }
     })
-
-    console.log("vendor Customers inside of removeProduct: ", customers)
 
     customers.forEach((customer) =>{
       req.io.to(customer.customerId).emit("update_vendor_product",{
