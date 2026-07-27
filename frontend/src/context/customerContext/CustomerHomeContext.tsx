@@ -37,7 +37,6 @@ interface RequestType {
 }
 
 
-
 interface Request {
   id: string
   vendorCustomerId: string
@@ -60,49 +59,18 @@ interface RequestApiResponse {
 }
 
 interface CustomerHomeState {
-  socket: Socket | null,
-  initCustomerSocket: (userId: string) => Promise<void>
   getCustomerSubscribedProducts: () => Promise<void>,
   customerRequest: (credential: RequestType) => Promise<void>,
   getAllRequestCustomer: () => Promise<void>,
   unsubcribeProduct: (id: string) => Promise<void>,
+  updateRequestDetails: (updatedRequest :any)=> void
   subcribedProducts: SubscribeProductState[],
   requestDetails: Request[]
 }
 
 export const useCustomerHomeContext = create<CustomerHomeState>()((set, get) => ({
-  socket: null,
   requestDetails: [],
   subcribedProducts: [],
-  initCustomerSocket: async (userId: string) => {
-    if (get().socket) return
-    const socket = io(process.env.EXPO_PUBLIC_BACKEND_URL, {
-      transports: ["websocket"],
-      autoConnect: true
-    })
-
-    // connect to backend socket
-    socket.on("connect",() =>{
-      socket.emit("join_room",userId)
-    })
-
-    socket.on("connect_error", (err) => console.log("Socket error: ", err.message))
-
-    socket.on("vendor_update_response",(updatedRequest: Request ) =>{
-      const flattened = { ...updatedRequest, productName: (updatedRequest as any).product?.productName || updatedRequest.productName }
-      set((state) =>({
-        requestDetails: state.requestDetails.map((request) =>
-          request.id == flattened.id ? flattened: request
-        )
-      }))
-      useCustomerSubscriptionStore.getState().fetchMySubscriptions().catch(() => {})
-      const subscriptionId = (updatedRequest as any).subscriptionId
-      if (subscriptionId) {
-        useCustomerSubscriptionStore.getState().fetchCalendar(subscriptionId).catch(() => {})
-      }
-    })
-    set({ socket });
-  },
   getCustomerSubscribedProducts: async () => {
     try {
       const res = await axiosInstance.get<subscribeProductApiresponse>("/subscription/get/subscribed-product")
@@ -156,5 +124,18 @@ export const useCustomerHomeContext = create<CustomerHomeState>()((set, get) => 
       const message = error?.response?.data?.message ?? error?.response?.data?.error ?? error.message ?? "Something went wrong";
       throw new Error(message);
     }
+  },
+  updateRequestDetails: (updatedRequest: Request) => {
+    const flattened = { ...updatedRequest, productName: (updatedRequest as any).product?.productName || updatedRequest.productName }
+      set((state) =>({
+        requestDetails: state.requestDetails.map((request) =>
+          request.id == flattened.id ? flattened: request
+        )
+      }))
+      useCustomerSubscriptionStore.getState().fetchMySubscriptions().catch(() => {})
+      const subscriptionId = (updatedRequest as any).subscriptionId
+      if (subscriptionId) {
+        useCustomerSubscriptionStore.getState().fetchCalendar(subscriptionId).catch(() => {})
+      }
   }
 }))

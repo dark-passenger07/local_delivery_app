@@ -46,7 +46,7 @@ export const subscribeProduct = async (req: Request, res: Response) => {
       where: {
         vendorCustomerId_productId: {
           vendorCustomerId: vendorCustomer.id,
-          productId,
+          productId: productId,
         },
       },
     })
@@ -90,8 +90,15 @@ export const subscribeProduct = async (req: Request, res: Response) => {
             unit: true,
           },
         },
+        vendorCustomers:{
+          include:{
+            user: true
+          }
+        }
       },
     })
+
+    req.io.to(product.vendorId).emit("customer_subscribed_product", newSubscription)
 
     return res.status(201).json({
       message: "Subscribed to the product successfully!",
@@ -170,6 +177,8 @@ export const unsubscribeProduct = async (req: Request, res: Response) => {
         },
       },
     })
+
+    req.io.to(product.vendorId).emit("customer_unsubcribed_product", productId)
 
     return res.status(200).json({
       message: "Product removed from subscription!",

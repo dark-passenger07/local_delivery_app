@@ -30,7 +30,6 @@ export const customerRequest = async (req: Request, res: Response) => {
       subscription: true
     } })
 
-    console.log("Product in request call: ", product)
 
     if (!product) {
       return res.status(404).json({ message: "Product doesn't exist!", success: false })
@@ -225,7 +224,7 @@ export const vendorResponse = async (req: Request, res: Response) => {
         success: false,
       })
     }
-
+    console.log("UpdatedRequest: ", updatedRequest)
     const userId = request.vendorCustomers.user.id
     if (userId) {
       req.io.to(userId).emit("vendor_update_response", updatedRequest)

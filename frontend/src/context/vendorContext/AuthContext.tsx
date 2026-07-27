@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { axiosInstance } from "../../api/axios"
 import { useVendorContextStore } from "./VendorContext"
 import { useRequestStore } from "./RequestContext";
+import { useSocketStore } from "../websocket/WebSocketStore";
 
 
 export type LoginTypes = {
@@ -112,7 +113,7 @@ export const useAuthStore = create<AuthState>()(
             // await CookieManager.clearAll(true)
             useVendorContextStore.getState().resetVendorProfile()
             set({ user: null })
-            useRequestStore.getState().disconnectSocket()
+            useSocketStore.getState().disconnectSocket()
             return res.data
           }
         } catch (error: any) {
@@ -123,7 +124,7 @@ export const useAuthStore = create<AuthState>()(
         } finally {
           await AsyncStorage.removeItem("auth-storage");
           useVendorContextStore.getState().resetVendorProfile()
-          useRequestStore.getState().disconnectSocket()
+          useSocketStore.getState().disconnectSocket()
           set({ user: null });
         }
       }

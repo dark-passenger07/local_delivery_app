@@ -34,7 +34,23 @@ export const addProduct = async (req: Request, res: Response) => {
         description,
         productName,
         unit
+      },
+      include:{
+        vendor: true
       }
+    })
+
+    // vendor customer
+    const customerIds = await db.vendorCustomers.findMany({
+      where:{
+        vendorId: vendor.id
+      },
+      select:{
+        customerId: true
+      }
+    })
+    customerIds.forEach((customer) =>{
+      req.io.to(customer.customerId).emit("Updated_Product_response", newProduct)
     })
 
     if (!newProduct) {
@@ -90,6 +106,25 @@ export const removeProduct = async (req: Request, res: Response) => {
     }
 
     await db.product.delete({ where: { id } });
+
+    // vendor customers
+    const customers = await db.vendorCustomers.findMany({
+      where:{
+        vendorId: vendor.id
+      },
+      select:{
+        customerId: true
+      }
+    })
+
+    customers.forEach((customer) =>{
+      req.io.to(customer.customerId).emit("update_vendor_product",{
+        action: "DELETE",
+        productId: product.id
+      })
+    })
+
+
     return res.status(200).json({
       message: "Product deleted successfully!",
       success: true
