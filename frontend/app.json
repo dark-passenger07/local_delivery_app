@@ -17,7 +17,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "cleartextTrafficPermitted": true
+      "cleartextTrafficPermitted": true,
+      "package": "com.vengeace.customermanagement"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -25,6 +26,11 @@
     "plugins": [
       "expo-status-bar",
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3f51a10f-b27e-45f1-8e75-3003ca298f8f"
+      }
+    }
   }
 }
