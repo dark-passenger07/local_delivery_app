@@ -124,17 +124,9 @@ export default function HomeScreen() {
       return;
     }
     const url = `tel:${digits}`;
-    Linking.canOpenURL(url)
-      .then((ok) => {
-        if (ok) {
-          Linking.openURL(url);
-        } else {
-          Alert.alert("Can't Call Right Now", "Your phone can't make this call right now.");
-        }
-      })
-      .catch(() => {
-        Alert.alert("Can't Call Right Now", "Something went wrong. Please try again.");
-      });
+    Linking.openURL(url).catch(() => {
+      Alert.alert("Can't Call Right Now", "Something went wrong. Please try again.");
+    });
   };
 
   const handleOpenForm = (productId: string, productName: string, unit: string) => {
@@ -413,86 +405,86 @@ export default function HomeScreen() {
               <Text style={styles.modalTitle}>Send a Request</Text>
               <Text style={styles.modalSubtitle}>For: {selectedProductName}</Text>
 
-               <Text style={styles.label}>1. What do you need?</Text>
-               <View style={styles.chipWrap}>
-                 {REQUEST_TYPES.map((opt) => {
-                   const isSelected = requestTypeKey === opt.key;
-                   return (
-                     <TouchableOpacity
-                       key={opt.key}
-                       style={[styles.chip, isSelected && styles.chipSelected]}
-                       onPress={() => handleSelectRequestType(opt.key, opt.label)}
-                       activeOpacity={0.8}
-                     >
-                       <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                         {opt.label}
-                       </Text>
-                     </TouchableOpacity>
-                   );
-                 })}
-               </View>
+              <Text style={styles.label}>1. What do you need?</Text>
+              <View style={styles.chipWrap}>
+                {REQUEST_TYPES.map((opt) => {
+                  const isSelected = requestTypeKey === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[styles.chip, isSelected && styles.chipSelected]}
+                      onPress={() => handleSelectRequestType(opt.key, opt.label)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-               {(requestTypeKey === "INCREASE" || requestTypeKey === "DECREASE") && (
-                 <TextInput
-                   style={styles.input}
-                   placeholder={`Requested quantity (${selectedProductUnit || 'unit'})`}
-                   placeholderTextColor="#9CA3AF"
-                   value={requestedQuantity}
-                   onChangeText={setRequestedQuantity}
-                   keyboardType="numeric"
-                 />
-               )}
-
-               <Text style={styles.label}>2. Choose your dates</Text>
-               <View style={styles.dateRow}>
-                 <View style={styles.dateColumn}>
-                   <Text style={styles.dateColumnLabel}>Start Date</Text>
-                   <TouchableOpacity style={styles.datePickerButton} onPress={() => openDatePicker("start")} activeOpacity={0.8}>
-                     <Text style={styles.datePickerIcon}>📅</Text>
-                     <Text style={startDateObj ? styles.dateText : styles.placeholderText}>
-                       {formatDateString(startDateObj)}
-                     </Text>
-                   </TouchableOpacity>
-                 </View>
-                 <View style={styles.dateColumn}>
-                   <Text style={styles.dateColumnLabel}>End Date</Text>
-                   <TouchableOpacity style={styles.datePickerButton} onPress={() => openDatePicker("end")} activeOpacity={0.8}>
-                     <Text style={styles.datePickerIcon}>📅</Text>
-                     <Text style={endDateObj ? styles.dateText : styles.placeholderText}>
-                       {formatDateString(endDateObj)}
-                     </Text>
-                   </TouchableOpacity>
-                 </View>
-               </View>
-
-               <Text style={styles.label}>3. Add a note (Explain your request breifly)</Text>
-               <TextInput
-                 style={[styles.input, styles.textArea]}
-                 placeholder="Write any extra details here"
-                 placeholderTextColor="#9CA3AF"
-                 multiline
-                 numberOfLines={4}
-                 value={message}
-                 onChangeText={setMessage}
-               />
-             </ScrollView>
-
-              {showPicker && (
-                <View style={styles.datePickerContainer}>
-                  <DateTimePicker
-                    value={
-                      pickerMode === "start"
-                        ? (startDateObj || new Date())
-                        : (endDateObj || startDateObj || new Date())
-                    }
-                    mode="date"
-                    display={Platform.OS === "ios" ? "spinner" : "default"}
-                    minimumDate={pickerMode === "end" && startDateObj ? startDateObj : new Date()}
-                    onValueChange={handleValueChange}
-                    onDismiss={handleDismiss}
-                  />
-                </View>
+              {(requestTypeKey === "INCREASE" || requestTypeKey === "DECREASE") && (
+                <TextInput
+                  style={styles.input}
+                  placeholder={`Requested quantity (${selectedProductUnit || 'unit'})`}
+                  placeholderTextColor="#9CA3AF"
+                  value={requestedQuantity}
+                  onChangeText={setRequestedQuantity}
+                  keyboardType="numeric"
+                />
               )}
+
+              <Text style={styles.label}>2. Choose your dates</Text>
+              <View style={styles.dateRow}>
+                <View style={styles.dateColumn}>
+                  <Text style={styles.dateColumnLabel}>Start Date</Text>
+                  <TouchableOpacity style={styles.datePickerButton} onPress={() => openDatePicker("start")} activeOpacity={0.8}>
+                    <Text style={styles.datePickerIcon}>📅</Text>
+                    <Text style={startDateObj ? styles.dateText : styles.placeholderText}>
+                      {formatDateString(startDateObj)}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.dateColumn}>
+                  <Text style={styles.dateColumnLabel}>End Date</Text>
+                  <TouchableOpacity style={styles.datePickerButton} onPress={() => openDatePicker("end")} activeOpacity={0.8}>
+                    <Text style={styles.datePickerIcon}>📅</Text>
+                    <Text style={endDateObj ? styles.dateText : styles.placeholderText}>
+                      {formatDateString(endDateObj)}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <Text style={styles.label}>3. Add a note (Explain your request breifly)</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Write any extra details here"
+                placeholderTextColor="#9CA3AF"
+                multiline
+                numberOfLines={4}
+                value={message}
+                onChangeText={setMessage}
+              />
+            </ScrollView>
+
+            {showPicker && (
+              <View style={styles.datePickerContainer}>
+                <DateTimePicker
+                  value={
+                    pickerMode === "start"
+                      ? (startDateObj || new Date())
+                      : (endDateObj || startDateObj || new Date())
+                  }
+                  mode="date"
+                  display={Platform.OS === "ios" ? "spinner" : "default"}
+                  minimumDate={pickerMode === "end" && startDateObj ? startDateObj : new Date()}
+                  onValueChange={handleValueChange}
+                  onDismiss={handleDismiss}
+                />
+              </View>
+            )}
 
             <View style={styles.modalActionRow}>
               <TouchableOpacity

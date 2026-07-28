@@ -145,7 +145,7 @@ export default function HomeScreen() {
       const digits = (item.phone || "").replace(/\D/g, "");
       if (!digits) return;
       const url = `tel:${digits}`;
-      Linking.canOpenURL(url).then((ok) => ok && Linking.openURL(url));
+      Linking.openURL(url);
     };
 
     return (

@@ -50,15 +50,7 @@ export const VendorScreen = () => {
       return;
     }
     const url = `tel:${digits}`;
-    Linking.canOpenURL(url)
-      .then((ok) => {
-        if (ok) {
-          Linking.openURL(url);
-        } else {
-          Alert.alert('Unable to Call', "Your device can't place this call right now.");
-        }
-      })
-      .catch(() => {
+    Linking.openURL(url) .catch(() => {
         Alert.alert('Unable to Call', 'Something went wrong trying to place the call.');
       });
   };

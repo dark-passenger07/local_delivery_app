@@ -121,7 +121,9 @@ const CustomerScreen = () => {
 
   const handleCall = (phoneNumber: string) => {
     if (!phoneNumber) return;
-    Linking.openURL(`tel:${phoneNumber}`);
+    Linking.openURL(`tel:${phoneNumber}`).catch(() =>{
+      Alert.alert("Can't Call Right Now", "Something went wrong. Please try again.");
+    });
   };
 
   const getSubscriptionCount = (customerId: string) => {

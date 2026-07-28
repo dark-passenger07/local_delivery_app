@@ -79,17 +79,9 @@ const RequestsScreen = () => {
       Alert.alert("No Phone Number", "This customer hasn't shared a phone number.");
       return;
     }
-    Linking.canOpenURL(`tel:${digits}`)
-      .then((ok) => {
-        if (ok) {
-          Linking.openURL(`tel:${digits}`);
-        } else {
-          Alert.alert("Can't Call Right Now", "Your phone can't make this call right now.");
-        }
-      })
-      .catch(() => {
-        Alert.alert("Can't Call Right Now", "Something went wrong. Please try again.");
-      });
+    Linking.openURL(`tel:${digits}`).catch(() =>{
+      Alert.alert("Can't Call Right Now", "Something went wrong. Please try again.");
+    });
   };
 
   const categorizedRequests = useMemo(() => {
