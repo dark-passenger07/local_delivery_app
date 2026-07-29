@@ -1,6 +1,6 @@
 import { Request, Response } from "express"
 import { db } from "../libs/db.js"
-import { PushTokenSchema } from "../generated/zod"
+import { PushTokenSchema } from "../generated/zod/index.js"
 
 const pushNotificationDetails = PushTokenSchema.omit({
   createdAt: true,
