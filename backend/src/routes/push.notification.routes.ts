@@ -1,6 +1,6 @@
 import express from "express"
-import { isAuthenticated } from "../middlewares/isAuthenticated";
-import { savePushTokenController,deletePushNotificationToken } from "../controllers/push.notification.controllers";
+import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { savePushTokenController,deletePushNotificationToken } from "../controllers/push.notification.controllers.js";
 
 const pushRouter = express.Router();
 
