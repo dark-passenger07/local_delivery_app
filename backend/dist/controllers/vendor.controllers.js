@@ -23,7 +23,6 @@ export const createVendorProfile = async (req, res) => {
                 success: false
             });
         }
-        console.log("user inside of createvendor: ", user);
         const { businessName, businessPhone } = validateBody.data;
         if (!user) {
             return res.status(400).json({

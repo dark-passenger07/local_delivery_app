@@ -11,7 +11,6 @@ export const signupController = async (req, res) => {
             updatedAt: true,
         });
         const validateBody = signup.safeParse(req.body);
-        console.log(validateBody.error?.issues);
         if (!validateBody.success) {
             return res.status(400).json({
                 success: false,
@@ -137,6 +136,7 @@ export const logoutController = async (req, res) => {
         });
     }
     catch (error) {
+        console.log("Error while loging out: ", error.message);
         return res.status(500).json({
             message: error.message,
             success: false,

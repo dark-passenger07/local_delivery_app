@@ -57,6 +57,9 @@ export const addCustomers = async (req, res) => {
                 vendorId,
                 customerPhone,
                 customerId: user.id
+            },
+            include: {
+                vendor: true,
             }
         });
         if (!newCustomer) {
@@ -65,6 +68,8 @@ export const addCustomers = async (req, res) => {
                 success: false
             });
         }
+        const vendorProfile = newCustomer.vendor;
+        req.io.to(user.id).emit("vendor_added_customer", vendorProfile);
         return res.status(200).json({
             message: "Customer added successfully!",
             success: true,
@@ -96,6 +101,20 @@ export const removeCustomer = async (req, res) => {
                 success: false
             });
         }
+        const isCustomer = await db.vendorCustomers.findUnique({
+            where: {
+                vendorId_customerId: {
+                    vendorId: vendorId,
+                    customerId: customer.id
+                }
+            }
+        });
+        if (!isCustomer) {
+            return res.status(400).json({
+                message: "Sorry! This user is not your customer",
+                success: false
+            });
+        }
         await db.vendorCustomers.delete({
             where: {
                 vendorId_customerId: {
@@ -103,6 +122,9 @@ export const removeCustomer = async (req, res) => {
                     customerId: customer.id
                 }
             }
+        });
+        req.io.to(customer.id).emit("customer_removed", {
+            vendorId: vendorId,
         });
         return res.status(200).json({
             message: "Customer removed successfully!",

@@ -9,13 +9,16 @@ import customerSubscriptionRouter from "./routes/customers.subscription.routes.j
 import requestRouter from "./routes/requests.routes.js";
 import { Server } from "socket.io";
 import http from "http";
+import pushRouter from "./routes/push.notification.routes.js";
 dotenv.config();
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 io.on('connection', (socket) => {
     socket.on('join_room', (userId) => {
+        console.log("-------------------");
         console.log(`User: ${userId} joined room`);
+        console.log("-------------------");
         socket.join(String(userId));
     });
 });
@@ -54,6 +57,7 @@ app.use("/product", productRouter);
 app.use("/customer", vendorCustomers);
 app.use("/subscription", customerSubscriptionRouter);
 app.use("/request", requestRouter);
+app.use("/notification", pushRouter);
 server.listen(PORT, () => {
     console.log(`App is listening to port: ${PORT}`);
 });

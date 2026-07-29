@@ -16,7 +16,7 @@ export const addProduct = async (req, res) => {
                 fieldErrors: validateBody.error.flatten().fieldErrors,
             });
         }
-        const { description, productName } = validateBody.data;
+        const { description, productName, unit } = validateBody.data;
         const vendor = req.vendor;
         if (!vendor) {
             return res.status(401).json({
@@ -24,12 +24,27 @@ export const addProduct = async (req, res) => {
                 success: false
             });
         }
-        console.log("req.vendor: ", req.vendor);
-        console.log("vendoorId: ", vendor);
         const newProduct = await db.product.create({
             data: {
-                vendorId: vendor.id, description, productName
+                vendorId: vendor.id,
+                description,
+                productName,
+                unit
+            },
+            include: {
+                vendor: true
             }
+        });
+        const customerIds = await db.vendorCustomers.findMany({
+            where: {
+                vendorId: vendor.id
+            },
+            select: {
+                customerId: true
+            }
+        });
+        customerIds.forEach((customer) => {
+            req.io.to(customer.customerId).emit("Updated_Product_response", newProduct);
         });
         if (!newProduct) {
             return res.status(500).json({
@@ -81,6 +96,20 @@ export const removeProduct = async (req, res) => {
             });
         }
         await db.product.delete({ where: { id } });
+        const customers = await db.vendorCustomers.findMany({
+            where: {
+                vendorId: vendor.id
+            },
+            select: {
+                customerId: true
+            }
+        });
+        customers.forEach((customer) => {
+            req.io.to(customer.customerId).emit("update_vendor_product", {
+                action: "DELETE",
+                productId: product.id
+            });
+        });
         return res.status(200).json({
             message: "Product deleted successfully!",
             success: true
