@@ -1,5 +1,5 @@
 import { Expo, ExpoPushMessage } from "expo-server-sdk"
-import { db } from "../libs/db"
+import { db } from "../libs/db.js"
 
 const expo = new Expo();
 

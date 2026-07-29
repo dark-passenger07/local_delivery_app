@@ -1,5 +1,5 @@
 import { Expo } from "expo-server-sdk";
-import { db } from "../libs/db";
+import { db } from "../libs/db.js";
 const expo = new Expo();
 export async function sendNotification(userId, title) {
     const pushTokens = await db.pushToken.findMany({

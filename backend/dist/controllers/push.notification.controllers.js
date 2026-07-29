@@ -1,4 +1,4 @@
-import { db } from "../libs/db";
+import { db } from "../libs/db.js";
 import { PushTokenSchema } from "../generated/zod";
 const pushNotificationDetails = PushTokenSchema.omit({
     createdAt: true,
