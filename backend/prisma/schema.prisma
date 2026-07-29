@@ -50,6 +50,11 @@ enum RequestType {
   DECREASE
 }
 
+enum Platform {
+  ANDROID
+  IOS
+}
+
 model User {
   id        String   @id @default(uuid())
   /// @zod.string.min(2, { message: "Name must be at least 2 characters long" })
@@ -63,6 +68,7 @@ model User {
 
   vendor          Vendor?           @relation("VendorIdRelation")
   vendorcustomers VendorCustomers[] @relation("CustomerIdRelation")
+  pushToken       PushToken[]
 }
 
 model Vendor {
@@ -156,4 +162,13 @@ model Requests {
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   subscription CustomerSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+}
+
+model PushToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  platform  Platform
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

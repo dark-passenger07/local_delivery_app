@@ -11,6 +11,7 @@ import requestRouter from "./routes/requests.routes.js";
 import cors from "cors"
 import { Server } from "socket.io"
 import http from "http"
+import pushRouter from "./routes/push.notification.routes.js";
 
 dotenv.config();
 
@@ -79,6 +80,8 @@ app.use("/product", productRouter)
 app.use("/customer", vendorCustomers)
 app.use("/subscription", customerSubscriptionRouter)
 app.use("/request", requestRouter)
+app.use("/notification", pushRouter)
+
 
 server.listen(PORT, () => {
   console.log(`App is listening to port: ${PORT}`)

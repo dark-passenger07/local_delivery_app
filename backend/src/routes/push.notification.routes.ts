@@ -1,0 +1,10 @@
+import express from "express"
+import { isAuthenticated } from "../middlewares/isAuthenticated";
+import { savePushTokenController,deletePushNotificationToken } from "../controllers/push.notification.controllers";
+
+const pushRouter = express.Router();
+
+pushRouter.post("/push-token", isAuthenticated, savePushTokenController)
+pushRouter.delete("/push-token", isAuthenticated,deletePushNotificationToken);
+
+export default pushRouter

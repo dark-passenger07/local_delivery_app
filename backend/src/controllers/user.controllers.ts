@@ -29,7 +29,7 @@ export const signupController = async (req: Request, res: Response) => {
         fieldErrors: validateBody.error.flatten().fieldErrors,
       });
     }
-    
+
 
     const { name, phone, role, address } = validateBody.data;
 
@@ -73,7 +73,7 @@ export const signupController = async (req: Request, res: Response) => {
       httpOnly: true,
       sameSite: "strict",
       secure: process.env.NODE_ENV === "production",
-      expires: new Date(Date.now() +60 * 24 * 60 * 60 * 1000)
+      expires: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
     })
 
 
@@ -107,10 +107,10 @@ export const loginController = async (req: Request, res: Response) => {
       address: true,
       createdAt: true,
       updatedAt: true,
-    })  
+    })
 
     const validateBody = login.safeParse(req.body)
-    console.log("validatebody: ",validateBody)
+    console.log("validatebody: ", validateBody)
     if (!validateBody.success) {
       return res.status(400).json({
         success: false,
@@ -170,7 +170,9 @@ export const logoutController = async (req: Request, res: Response) => {
       message: "User logout successfully!",
       success: true,
     })
+
   } catch (error: any) {
+    console.log("Error while loging out: ", error.message)
     return res.status(500).json({
       message: error.message,
       success: false,

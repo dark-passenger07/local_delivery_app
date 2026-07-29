@@ -4,8 +4,9 @@ import { persist, createJSONStorage } from "zustand/middleware"
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { axiosInstance } from "../../api/axios"
 import { useVendorContextStore } from "./VendorContext"
-import { useRequestStore } from "./RequestContext";
 import { useSocketStore } from "../websocket/WebSocketStore";
+import { registerPushToken, unregisterPushToken } from "../../services/registerForPushToken";
+
 
 
 export type LoginTypes = {
@@ -57,6 +58,7 @@ export const useAuthStore = create<AuthState>()(
           if (res.data.user) {
             useVendorContextStore.getState().resetVendorProfile()
             set({ user: res.data.user })
+            await registerPushToken();
           }
           return res.data;
         } catch (error: any) {
@@ -74,6 +76,7 @@ export const useAuthStore = create<AuthState>()(
           if (res.data.user) {
             useVendorContextStore.getState().resetVendorProfile()
             set({ user: res.data.user })
+            await registerPushToken()
           }
 
           return res.data
@@ -97,6 +100,8 @@ export const useAuthStore = create<AuthState>()(
           if (res.data.user) {
             useVendorContextStore.getState().resetVendorProfile()
             set({ user: res.data.user })
+
+            await registerPushToken();
           }
           return res.data
         } catch (error: any) {
@@ -108,6 +113,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         try {
+           await unregisterPushToken();
           const res = await axiosInstance.post("/auth/logout")
           if (res.data.success) {
             // await CookieManager.clearAll(true)

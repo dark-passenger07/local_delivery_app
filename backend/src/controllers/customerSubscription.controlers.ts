@@ -2,6 +2,7 @@ import { Request, Response } from "express"
 import { z } from "zod"
 import { db } from "../libs/db.js"
 import { SubscriptionService, type CalendarDay, type SubscriptionStats } from "../services/subscription.service.js"
+import { sendNotification } from "../services/notification.service.js"
 
 const SubscriptionSchema = z.object({
   productId: z.string(),
@@ -90,13 +91,20 @@ export const subscribeProduct = async (req: Request, res: Response) => {
             unit: true,
           },
         },
-        vendorCustomers:{
-          include:{
+        vendorCustomers: {
+          include: {
             user: true
           }
         }
       },
     })
+
+    // send notiifcation to the vendor that a customer has subscribed to his product
+    await sendNotification(
+      product.vendorId,
+      `A customer ${user.name} has subscribed to your ${product.productName} product`,
+
+    );
 
     req.io.to(product.vendorId).emit("customer_subscribed_product", newSubscription)
 
@@ -525,13 +533,14 @@ export const getVendorSubscriptionStats = async (req: Request, res: Response) =>
   }
 }
 
-export const isValidRequest = async(req: Request, res: Response) =>{
+// not important for now
+export const isValidRequest = async (req: Request, res: Response) => {
   try {
     // check the subscription id with the request subscription id 
 
     // if the request subscription id is not found then no need to take that request as accepted request because customer has already removed that product
 
   } catch (error) {
-    
+
   }
 }
