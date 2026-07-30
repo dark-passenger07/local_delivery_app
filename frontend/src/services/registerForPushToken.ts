@@ -40,7 +40,7 @@ export async function unregisterPushToken() {
   if (status !== "granted") return;
 
   const token = (await Notifications.getExpoPushTokenAsync()).data;
-
+  
   await axiosInstance.delete("/notification/push-token", {
     data: {
       token,

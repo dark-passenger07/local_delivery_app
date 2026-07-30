@@ -1,6 +1,7 @@
 import { Request, Response } from "express"
 import { VendorCustomersSchema } from "../generated/zod/index.js"
 import { db } from "../libs/db.js";
+import { sendNotification } from "../services/notification.service.js";
 
 
 
@@ -85,6 +86,9 @@ export const addCustomers = async (req: Request, res: Response) => {
 
     req.io.to(user.id).emit("vendor_added_customer", vendorProfile)
 
+    //send notification to the customer
+    await sendNotification(user.id,`You've been added as a customer`,`${vendorProfile.businessName} added you as their customer.`);
+
     return res.status(200).json({
       message: "Customer added successfully!",
       success: true,
@@ -109,7 +113,6 @@ export const removeCustomer = async (req: Request, res: Response) => {
         success: false
       })
     }
-
 
     const vendorId = req?.vendor?.id;
     if (!vendorId) {
@@ -150,6 +153,13 @@ export const removeCustomer = async (req: Request, res: Response) => {
       vendorId: vendorId,
     }
     )
+
+    await sendNotification(
+      customer.id,
+      `Update from ${req.vendor?.businessName}`,
+      `Hi ${customer.name}, you have been removed from the customer list by ${req.vendor?.businessName}.`
+    );
+
 
     return res.status(200).json({
       message: "Customer removed successfully!",

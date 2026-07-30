@@ -6,6 +6,7 @@ const expo = new Expo();
 export async function sendNotification(
   userId: string,
   title: string,
+  body: string,
 ) {
   const pushTokens = await db.pushToken.findMany({
     where: {
@@ -13,7 +14,7 @@ export async function sendNotification(
     }
   })
 
-  if (pushTokens.length == 0) {
+  if (pushTokens.length === 0) {
     return
   }
 
@@ -21,7 +22,6 @@ export async function sendNotification(
   const invalidTokens: string[] = [];
 
   for (const pushToken of pushTokens) {
-    // Validate Expo token
     if (!Expo.isExpoPushToken(pushToken.token)) {
       invalidTokens.push(pushToken.token);
       continue;
@@ -31,28 +31,31 @@ export async function sendNotification(
       to: pushToken.token,
       sound: "default",
       title,
+      body,
     });
+  }
 
-    // Remove invalid tokens from database
-    if (invalidTokens.length > 0) {
-      await db.pushToken.deleteMany({
-        where: {
-          token: {
-            in: invalidTokens,
-          },
+  if (invalidTokens.length > 0) {
+    await db.pushToken.deleteMany({
+      where: {
+        token: {
+          in: invalidTokens,
         },
-      });
-    }
+      },
+    });
+  }
 
-    // chunk messages
-    const chunks = expo.chunkPushNotifications(messages);
+  if (messages.length === 0) {
+    return;
+  }
 
-    for (const chunk of chunks) {
-      try {
-        await expo.sendPushNotificationsAsync(chunk);
-      } catch (err) {
-        console.error("Push Notification Error:", err);
-      }
+  const chunks = expo.chunkPushNotifications(messages);
+
+  for (const chunk of chunks) {
+    try {
+      await expo.sendPushNotificationsAsync(chunk);
+    } catch (err) {
+      console.error("Push Notification Error:", err);
     }
   }
 }

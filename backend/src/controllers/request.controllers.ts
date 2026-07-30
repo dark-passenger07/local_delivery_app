@@ -2,6 +2,7 @@ import { Request, Response } from "express"
 import { z } from "zod"
 import { db } from "../libs/db.js"
 import type { Requests } from "../generated/zod/index.js"
+import { sendNotification } from "../services/notification.service.js"
 
 const RequestSchema = z.object({
   type: z.enum(["NOTE", "SKIP", "INCREASE", "DECREASE"]),
@@ -100,6 +101,21 @@ export const customerRequest = async (req: Request, res: Response) => {
     if (product.vendorId) {
       req.io.to(product.vendorId).emit("new_request_created", newRequest)
     }
+
+    const vendor = await db.vendor.findUnique({
+      where:{
+        id: product.vendorId
+      }
+    })
+
+    if(!vendor){
+      return res.status(404).json({
+        message: "Vendor profile is not valid!",
+        success: false
+      })
+    }
+
+    await sendNotification(vendor?.userId,`${user.name} has requested`, `Customer has a request for ${product.productName} product`)
 
     return res.status(201).json({
       message: "Request added successfully!",
@@ -228,6 +244,23 @@ export const vendorResponse = async (req: Request, res: Response) => {
     const userId = request.vendorCustomers.user.id
     if (userId) {
       req.io.to(userId).emit("vendor_update_response", updatedRequest)
+    }
+
+    const vendorName = req.vendor?.businessName;
+    const productName = updatedRequest.product?.productName
+
+    if (status === "ACCEPTED" && userId) {
+      try {
+        await sendNotification(userId, "Request Accepted", `${vendorName} accepted your ${productName} request`)
+      } catch (notifError: any) {
+        console.log("Error sending push notification for accepted request: ", notifError.message)
+      }
+    } else if (status === "REJECTED" && userId) {
+      try {
+        await sendNotification(userId, "Request Rejected", `${vendorName} rejected your ${productName} request`)
+      } catch (notifError: any) {
+        console.log("Error sending push notification for rejected request: ", notifError.message)
+      }
     }
 
     return res.status(200).json({

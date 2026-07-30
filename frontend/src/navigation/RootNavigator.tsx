@@ -12,7 +12,6 @@ import { useSocketStore } from "../context/websocket/WebSocketStore";
 export default function RootNavigator() {
   const user = useAuthStore((state) => state.user);
   const hasVendorProfile = useVendorContextStore((state) => state.hasVendorProfile);
-  // Renamed this selector to match your store's check function
   const checkVendorProfileStatus = useVendorContextStore((state) => state.isCreatedVendorProfile);
   const resetVendorProfile = useVendorContextStore((state) => state.resetVendorProfile);
   

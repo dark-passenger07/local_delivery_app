@@ -99,12 +99,26 @@ export const subscribeProduct = async (req: Request, res: Response) => {
       },
     })
 
+    const vendorData = await db.vendor.findUnique({
+      where:{
+        id: product.vendorId
+      }
+    }) 
+
+    if(!vendorData){
+      return res.status(404).json({
+        message: "Can't fetch the vendor data to send notification!",
+        success: false
+      })
+    }
+
     // send notiifcation to the vendor that a customer has subscribed to his product
     await sendNotification(
-      product.vendorId,
-      `A customer ${user.name} has subscribed to your ${product.productName} product`,
-
+      vendorData.userId,
+      `🎉 New Subscriber!`,
+      `${user.name} just subscribed to your product, ${product.productName}.`
     );
+
 
     req.io.to(product.vendorId).emit("customer_subscribed_product", newSubscription)
 
@@ -187,6 +201,29 @@ export const unsubscribeProduct = async (req: Request, res: Response) => {
     })
 
     req.io.to(product.vendorId).emit("customer_unsubcribed_product", productId)
+
+    const vendor = await db.vendor.findUnique({
+      where:{
+        id: product.vendorId
+      }
+    })
+
+    // fetch the vendor details to get the vendor profile data
+    // so that we can send notification to the vendor
+    if(!vendor){
+      return res.status(404).json({
+        message: "Can't fetch the vendor data to send notification!",
+        success: false
+      })
+    }
+
+    //send notificatio to the vendor
+    await sendNotification(
+      vendor.userId,
+      `Subscription Deactivated: ${product.productName}`,
+      `${user.name} has deactivated their subscription to your product, ${product.productName}.`
+    );
+
 
     return res.status(200).json({
       message: "Product removed from subscription!",
