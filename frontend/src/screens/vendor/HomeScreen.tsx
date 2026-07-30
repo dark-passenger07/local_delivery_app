@@ -81,9 +81,14 @@ export default function HomeScreen() {
 
   const { subscribedProducts, subscribedCustomers, error: storeError } = useCustomerSubscriptionStore();
   const { vendorAccount } = useVendorContextStore();
-  const { allProducts } = useProductStore();
+  const { allProducts,getAllProducts } = useProductStore();
+
+  const fetchProducts = async() =>{
+    await getAllProducts()
+  }
 
   const vendorCustomers = useMemo(() => {
+    fetchProducts();
     const customerMap = new Map<string, CustomerState>();
     subscribedProducts.forEach((item: any) => {
       const user = item.vendorCustomers?.user;

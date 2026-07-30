@@ -16,6 +16,9 @@ export interface CustomerRequest {
   vendorCustomerId: string;
   productId: string;
   productName?: string;
+  product: {
+    productName: string
+  };
   type: string;
   message: string;
   start_date: string;

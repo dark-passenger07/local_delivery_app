@@ -113,7 +113,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         try {
-           await unregisterPushToken();
+          await unregisterPushToken();
           const res = await axiosInstance.post("/auth/logout")
           if (res.data.success) {
             // await CookieManager.clearAll(true)

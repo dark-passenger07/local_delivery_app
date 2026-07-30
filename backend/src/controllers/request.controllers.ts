@@ -88,6 +88,7 @@ export const customerRequest = async (req: Request, res: Response) => {
             user: true,
           },
         },
+        product: true
       },
     })
 

@@ -28,7 +28,6 @@ interface Request {
   id: string
   vendorCustomerId: string
   productId: string
-  product: ProductType
   productName?: string
   type: string
   message: string
@@ -54,8 +53,10 @@ export interface CustomerRequest {
   id: string;
   vendorCustomerId: string;
   productId: string;
-  product: ProductType
-  productName?: string;
+  product: {
+    productName: string
+  };
+  productName: string;
   type: string;
   message: string;
   start_date: string;
@@ -100,6 +101,7 @@ export const useSocketStore = create<SocketStore>()((set, get) => ({
     // when there is a new request update the vendor request section instantly
     socket.on("new_request_created", (newRequest: CustomerRequest) => {
       const mappedRequest = { ...newRequest, productName: newRequest.product?.productName }
+
       useRequestStore.getState().getNewRequest(mappedRequest)
     })
 
