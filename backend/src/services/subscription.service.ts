@@ -27,14 +27,25 @@ export interface SubscriptionStats {
   upcomingRequests: number;
   monthlyDeliveredQuantity: string;
   vendorBusinessName: string;
-  /// Per-unit price the customer entered when subscribing.
+  /// Per-unit price in effect today (from the subscription's price history,
+  /// falling back to the price entered at subscribe time).
   price: string;
-  /// Revenue for the queried month: monthly delivered quantity x price.
+  /// A future price change scheduled by the vendor, if any.
+  upcomingPrice: string | null;
+  upcomingPriceEffectiveFrom: string | null;
+  /// Revenue for the queried month, priced day-by-day so a mid-month price
+  /// change values each day at the price that applied on that day.
   monthlyRevenue: string;
   /// All-time revenue since the subscription started, bounded by the stop
   /// date for stopped subscriptions and reflecting accepted skip/increase/
   /// decrease requests.
   totalRevenue: string;
+}
+
+/// A price and the first day it applies to, ordered oldest-first by callers.
+export interface PriceRow {
+  price: string;
+  effectiveFrom: Date;
 }
 
 export interface VendorRevenueItem {
@@ -44,6 +55,8 @@ export interface VendorRevenueItem {
   productName: string;
   productUnit: string;
   price: string;
+  upcomingPrice: string | null;
+  upcomingPriceEffectiveFrom: string | null;
   deliveredQuantity: string;
   revenue: string;
   status: string;
@@ -159,6 +172,10 @@ export class SubscriptionService {
             customerId: true,
           },
         },
+        prices: {
+          orderBy: { effectiveFrom: "asc" },
+          select: { price: true, effectiveFrom: true },
+        },
       },
     });
 
@@ -186,7 +203,13 @@ export class SubscriptionService {
       throw new Error("Invalid month. Must be between 1 and 12");
     }
 
-    const price = parseFloat(subscription.price.toString()) || 0;
+    // The price entered at subscribe time acts as the fallback for days not
+    // covered by an explicit price-history row (i.e. legacy subscriptions).
+    const fallbackPrice = parseFloat(subscription.price.toString()) || 0;
+    const priceRows: PriceRow[] = subscription.prices.map((p) => ({
+      price: p.price.toString(),
+      effectiveFrom: p.effectiveFrom,
+    }));
 
     const acceptedRequests = await db.requests.findMany({
       where: {
@@ -210,17 +233,30 @@ export class SubscriptionService {
     // subscription was stopped earlier.
     const effectiveNow = stopDay && stopDay < now ? stopDay : now;
 
-    // All-time delivered quantity since the subscription started, bounded by the
-    // stop date. getEffectiveQuantityForDate applies accepted skip / increase /
-    // decrease requests, so total revenue always reflects those changes and
-    // stops at the unsubscribe date.
-    const totalDeliveredQuantity = this.computeDeliveredQuantityInRange(
+    // All-time delivered quantity and revenue since the subscription started,
+    // bounded by the stop date. Quantity reflects accepted skip / increase /
+    // decrease requests, and each day is priced with the price that applied on
+    // that day, so revenue stops at unsubscribe and respects price changes.
+    const allTime = this.computeDeliveryTotalsInRange(
       startDate,
       effectiveNow,
       subscription.dailyQuantity.toString(),
-      acceptedRequests
+      acceptedRequests,
+      priceRows,
+      fallbackPrice
     );
-    const totalRevenue = totalDeliveredQuantity * price;
+    const totalRevenue = allTime.revenue;
+
+    // Price in effect today, plus any change the vendor has scheduled.
+    const { current: currentPrice, upcoming } = this.splitCurrentAndUpcomingPrice(
+      priceRows,
+      fallbackPrice,
+      now
+    );
+    const upcomingPrice = upcoming ? parseFloat(upcoming.price).toString() : null;
+    const upcomingPriceEffectiveFrom = upcoming
+      ? new Date(upcoming.effectiveFrom).toISOString()
+      : null;
 
     if (lastDayOfMonth < startDate) {
       return {
@@ -235,7 +271,9 @@ export class SubscriptionService {
         upcomingRequests: 0,
         monthlyDeliveredQuantity: "0",
         vendorBusinessName,
-        price: price.toString(),
+        price: currentPrice.toString(),
+        upcomingPrice,
+        upcomingPriceEffectiveFrom,
         monthlyRevenue: "0",
         totalRevenue: totalRevenue.toString(),
       };
@@ -244,31 +282,19 @@ export class SubscriptionService {
     const rangeStart = firstDayOfMonth > startDate ? firstDayOfMonth : startDate;
     const rangeEnd = lastDayOfMonth < effectiveNow ? lastDayOfMonth : effectiveNow;
 
-    let monthlyDeliveredQuantity = 0;
-    let receivedDays = 0;
-    let skippedDays = 0;
+    const monthly = this.computeDeliveryTotalsInRange(
+      rangeStart,
+      rangeEnd,
+      subscription.dailyQuantity.toString(),
+      acceptedRequests,
+      priceRows,
+      fallbackPrice
+    );
 
-    for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
-      const dayStart = new Date(d);
-      dayStart.setHours(0, 0, 0, 0);
-
-      const effectiveQuantity = this.getEffectiveQuantityForDate(
-        dayStart,
-        subscription.dailyQuantity.toString(),
-        acceptedRequests
-      );
-
-      const qty = parseFloat(effectiveQuantity) || 0;
-      monthlyDeliveredQuantity += qty;
-
-      if (qty === 0) {
-        skippedDays++;
-      } else {
-        receivedDays++;
-      }
-    }
-
-    const monthlyRevenue = monthlyDeliveredQuantity * price;
+    const monthlyDeliveredQuantity = monthly.quantity;
+    const receivedDays = monthly.receivedDays;
+    const skippedDays = monthly.skippedDays;
+    const monthlyRevenue = monthly.revenue;
 
     return {
       subscriptionId: subscription.id,
@@ -282,7 +308,9 @@ export class SubscriptionService {
       upcomingRequests: 0,
       monthlyDeliveredQuantity: monthlyDeliveredQuantity.toString(),
       vendorBusinessName,
-      price: price.toString(),
+      price: currentPrice.toString(),
+      upcomingPrice,
+      upcomingPriceEffectiveFrom,
       monthlyRevenue: monthlyRevenue.toString(),
       totalRevenue: totalRevenue.toString(),
     };
@@ -471,37 +499,111 @@ export class SubscriptionService {
   }
 
   /**
-   * Sum the effective delivered quantity for each day in [rangeStart, rangeEnd]
-   * (inclusive). Accepted skip / increase / decrease requests are applied per
-   * day via getEffectiveQuantityForDate. Returns 0 when the range is empty
-   * (e.g. a subscription whose start date is in the future).
+   * The per-unit price that applies on a given day: the most recent price whose
+   * effectiveFrom falls on or before that day. Subscriptions created before
+   * price history existed have no rows, so we fall back to the price stored on
+   * the subscription itself.
    */
-  private static computeDeliveredQuantityInRange(
+  private static getEffectivePriceForDate(
+    date: Date,
+    priceRows: PriceRow[],
+    fallbackPrice: number
+  ): number {
+    const day = new Date(date);
+    day.setHours(0, 0, 0, 0);
+
+    let applicable: number | null = null;
+    for (const row of priceRows) {
+      const from = new Date(row.effectiveFrom);
+      from.setHours(0, 0, 0, 0);
+      if (from <= day) {
+        // priceRows are ordered oldest-first, so later matches win.
+        applicable = parseFloat(row.price) || 0;
+      }
+    }
+
+    return applicable ?? fallbackPrice;
+  }
+
+  /**
+   * Sum the effective delivered quantity and revenue for each day in
+   * [rangeStart, rangeEnd] (inclusive). Accepted skip / increase / decrease
+   * requests are applied per day via getEffectiveQuantityForDate, and each day
+   * is priced with the price in force on that day. Returns zeros when the range
+   * is empty (e.g. a subscription whose start date is in the future).
+   */
+  private static computeDeliveryTotalsInRange(
     rangeStart: Date,
     rangeEnd: Date,
     baseQuantity: string,
-    acceptedRequests: any[]
-  ): number {
-    let total = 0;
+    acceptedRequests: any[],
+    priceRows: PriceRow[],
+    fallbackPrice: number
+  ): { quantity: number; revenue: number; receivedDays: number; skippedDays: number } {
+    let quantity = 0;
+    let revenue = 0;
+    let receivedDays = 0;
+    let skippedDays = 0;
+
     for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
       const dayStart = new Date(d);
       dayStart.setHours(0, 0, 0, 0);
+
       const effectiveQuantity = this.getEffectiveQuantityForDate(
         dayStart,
         baseQuantity,
         acceptedRequests
       );
-      total += parseFloat(effectiveQuantity) || 0;
+
+      const qty = parseFloat(effectiveQuantity) || 0;
+      const dayPrice = this.getEffectivePriceForDate(dayStart, priceRows, fallbackPrice);
+
+      quantity += qty;
+      revenue += qty * dayPrice;
+
+      if (qty === 0) {
+        skippedDays++;
+      } else {
+        receivedDays++;
+      }
     }
-    return total;
+
+    return { quantity, revenue: Math.round(revenue * 100) / 100, receivedDays, skippedDays };
+  }
+
+  /**
+   * Split a subscription's price rows into the price applying today and the
+   * next scheduled future change (if the vendor has queued one).
+   */
+  private static splitCurrentAndUpcomingPrice(
+    priceRows: PriceRow[],
+    fallbackPrice: number,
+    today: Date
+  ): { current: number; upcoming: PriceRow | null } {
+    const current = this.getEffectivePriceForDate(today, priceRows, fallbackPrice);
+
+    let upcoming: PriceRow | null = null;
+    let upcomingDay: number | null = null;
+    for (const row of priceRows) {
+      const from = new Date(row.effectiveFrom);
+      from.setHours(0, 0, 0, 0);
+      // Compare on the normalized day so rows stored at different times of the
+      // same day cannot flip which one is considered "next".
+      if (from > today && (upcomingDay === null || from.getTime() < upcomingDay)) {
+        upcoming = row;
+        upcomingDay = from.getTime();
+      }
+    }
+
+    return { current, upcoming };
   }
 
   /**
    * Aggregate all-time revenue for a vendor across every customer subscription
-   * (both ACTIVE and STOPPED). Revenue for each subscription is the effective
+   * (both ACTIVE and STOPPED). Each subscription's revenue is its effective
    * delivered quantity — after accepted skip / increase / decrease requests and
-   * bounded by the stop date so it stops at unsubscribe — multiplied by the
-   * per-unit price the customer entered.
+   * bounded by the stop date so it stops at unsubscribe — priced day-by-day
+   * from the subscription's price history.
    */
   static async getVendorTotalRevenue(vendorId: string): Promise<VendorTotalRevenue> {
     const subscriptions = await db.customerSubscription.findMany({
@@ -526,6 +628,10 @@ export class SubscriptionService {
               },
             },
           },
+        },
+        prices: {
+          orderBy: { effectiveFrom: "asc" },
+          select: { price: true, effectiveFrom: true },
         },
       },
       orderBy: {
@@ -558,16 +664,30 @@ export class SubscriptionService {
         : null;
       const effectiveNow = stopDay && stopDay < now ? stopDay : now;
 
-      const deliveredQuantity = this.computeDeliveredQuantityInRange(
+      const fallbackPrice = parseFloat(subscription.price.toString()) || 0;
+      const priceRows: PriceRow[] = subscription.prices.map((p) => ({
+        price: p.price.toString(),
+        effectiveFrom: p.effectiveFrom,
+      }));
+
+      const totals = this.computeDeliveryTotalsInRange(
         startDate,
         effectiveNow,
         subscription.dailyQuantity.toString(),
-        acceptedRequests
+        acceptedRequests,
+        priceRows,
+        fallbackPrice
       );
 
-      const price = parseFloat(subscription.price.toString()) || 0;
-      const revenue = deliveredQuantity * price;
+      const deliveredQuantity = totals.quantity;
+      const revenue = totals.revenue;
       totalRevenue += revenue;
+
+      const { current: currentPrice, upcoming } = this.splitCurrentAndUpcomingPrice(
+        priceRows,
+        fallbackPrice,
+        now
+      );
 
       items.push({
         subscriptionId: subscription.id,
@@ -575,7 +695,11 @@ export class SubscriptionService {
         customerName: subscription.vendorCustomers.user.name,
         productName: subscription.product.productName,
         productUnit: subscription.product.unit,
-        price: price.toString(),
+        price: currentPrice.toString(),
+        upcomingPrice: upcoming ? parseFloat(upcoming.price).toString() : null,
+        upcomingPriceEffectiveFrom: upcoming
+          ? new Date(upcoming.effectiveFrom).toISOString()
+          : null,
         deliveredQuantity: deliveredQuantity.toString(),
         revenue: revenue.toString(),
         status: subscription.status,
@@ -588,7 +712,7 @@ export class SubscriptionService {
     items.sort((a, b) => parseFloat(b.revenue) - parseFloat(a.revenue));
 
     return {
-      totalRevenue: totalRevenue.toString(),
+      totalRevenue: (Math.round(totalRevenue * 100) / 100).toString(),
       items,
     };
   }

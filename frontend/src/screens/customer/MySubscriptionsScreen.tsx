@@ -111,6 +111,14 @@ export default function MySubscriptionsScreen() {
             <Text style={styles.revenueValueStrong}>{formatCurrency(item.totalRevenue)}</Text>
           </View>
         </View>
+
+        {item.upcomingPrice && item.upcomingPriceEffectiveFrom && (
+          <View style={styles.upcomingPriceNote}>
+            <Text style={styles.upcomingPriceText}>
+              🕒 Your vendor has set a new price of {formatCurrency(item.upcomingPrice)} per unit, starting {formatDate(item.upcomingPriceEffectiveFrom)}.
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.cardFooter}>
@@ -250,6 +258,17 @@ const styles = StyleSheet.create({
   revenueLabel: { fontSize: 12, color: '#047857', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
   revenueValue: { fontSize: 18, color: '#065F46', fontWeight: '800', marginTop: 6 },
   revenueValueStrong: { fontSize: 20, color: '#065F46', fontWeight: '900', marginTop: 6 },
+
+  upcomingPriceNote: {
+    marginTop: 12,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  upcomingPriceText: { fontSize: 13, lineHeight: 19, color: '#92400E', fontWeight: '700' },
 
   cardFooter: { marginTop: 18 },
   calendarButton: {

@@ -7,12 +7,16 @@ import {
   ActivityIndicator,
   StyleSheet,
   Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
 import { RouteProp } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
-import { useCustomerSubscriptionStore, type VendorSubscribedProduct, type VendorSubscriptionStats } from "../../context/vendorContext/CustomerSubscriptionContex";
+import { useCustomerSubscriptionStore, type VendorSubscribedProduct, type VendorSubscriptionStats, type PriceEffectiveFrom } from "../../context/vendorContext/CustomerSubscriptionContex";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 type RouteParams = {
@@ -26,12 +30,18 @@ export default function CustomerSubscriptionsScreen() {
   const route = useRoute<RouteProp<RouteParams, 'CustomerSubscriptions'>>()
   const navigation = useNavigation<NativeStackNavigationProp<any>>()
   const { customerId, customerName } = route.params
-  const { fetchCustomerSubscriptions, fetchVendorSubscriptionStats } = useCustomerSubscriptionStore()
+  const { fetchCustomerSubscriptions, fetchVendorSubscriptionStats, deleteStoppedSubscription, updateSubscriptionPrice } = useCustomerSubscriptionStore()
 
   const [subscriptions, setSubscriptions] = useState<VendorSubscribedProduct[]>([])
   const [statsMap, setStatsMap] = useState<Record<string, VendorSubscriptionStats>>({})
   const [loading, setLoading] = useState(false)
   const [statsLoading, setStatsLoading] = useState(false)
+
+  // Price-edit modal state
+  const [priceTarget, setPriceTarget] = useState<VendorSubscribedProduct | null>(null)
+  const [priceInput, setPriceInput] = useState("")
+  const [priceTiming, setPriceTiming] = useState<PriceEffectiveFrom>("NEXT_DAY")
+  const [savingPrice, setSavingPrice] = useState(false)
 
   useEffect(() => {
     loadSubscriptions()
@@ -94,6 +104,132 @@ export default function CustomerSubscriptionsScreen() {
 
   const formatCurrency = (value: string | number) => `₹${Number(value ?? 0).toFixed(2)}`
 
+  // Deleting a stopped subscription is irreversible, so the vendor is asked to
+  // confirm twice before the request is sent (matches the logout safeguard).
+  const handleDeletePress = (item: VendorSubscribedProduct) => {
+    Alert.alert(
+      'Delete this record?',
+      `Remove ${customerName}'s stopped subscription to "${item.product.productName}"? This also deletes its delivery history and removes it from your Total Revenue.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Are you sure?',
+              'This permanently deletes the subscription record. This action cannot be undone.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Yes, delete',
+                  style: 'destructive',
+                  onPress: () => confirmDelete(item.id),
+                },
+              ]
+            )
+          },
+        },
+      ]
+    )
+  }
+
+  const confirmDelete = async (subscriptionId: string) => {
+    try {
+      await deleteStoppedSubscription(subscriptionId)
+      setSubscriptions((prev) => prev.filter((s) => s.id !== subscriptionId))
+      Alert.alert('Deleted', 'The subscription record has been removed.')
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to delete the subscription record.')
+    }
+  }
+
+  // Mirrors the backend: NEXT_DAY = tomorrow 00:00, NEXT_MONTH = the 1st of next month.
+  // Used only to preview the date before saving; the saved date comes back from the server.
+  const resolveEffectiveDate = (timing: PriceEffectiveFrom) => {
+    const date = new Date()
+    date.setHours(0, 0, 0, 0)
+    if (timing === 'NEXT_DAY') {
+      date.setDate(date.getDate() + 1)
+    } else {
+      date.setMonth(date.getMonth() + 1, 1)
+    }
+    return date
+  }
+
+  const formatLongDate = (date: Date) =>
+    date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+
+  const openPriceModal = (item: VendorSubscribedProduct) => {
+    // Prefill with the price actually in force today (stats), not the original
+    // subscribe-time price stored on the row.
+    const currentPrice = statsMap[item.id]?.price ?? item.price
+    setPriceTarget(item)
+    setPriceInput(currentPrice ? Number(currentPrice).toString() : '')
+    setPriceTiming('NEXT_DAY')
+  }
+
+  const closePriceModal = () => {
+    if (savingPrice) return
+    setPriceTarget(null)
+    setPriceInput('')
+  }
+
+  const handleSavePrice = () => {
+    if (!priceTarget) return
+
+    const parsed = parseFloat(priceInput)
+    if (!priceInput.trim() || isNaN(parsed) || parsed <= 0) {
+      Alert.alert('Invalid price', 'Enter a price greater than 0.')
+      return
+    }
+
+    const effectiveDate = resolveEffectiveDate(priceTiming)
+    // Confirm with the exact date so the vendor can never mistake "next month"
+    // for "right now" — revenue before this date keeps the old price.
+    Alert.alert(
+      'Confirm new price',
+      `${priceTarget.product.productName} for ${customerName} will cost ${formatCurrency(parsed)} per ${priceTarget.product.unit.toLowerCase()} starting ${formatLongDate(effectiveDate)}.\n\nDeliveries before that date keep the current price. ${customerName} will be notified.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Confirm', onPress: () => submitPrice(priceTarget.id, parsed, priceTiming) },
+      ]
+    )
+  }
+
+  const submitPrice = async (subscriptionId: string, price: number, timing: PriceEffectiveFrom) => {
+    try {
+      setSavingPrice(true)
+      const result = await updateSubscriptionPrice(subscriptionId, price, timing)
+
+      // Keep the card in sync without waiting for a refetch.
+      setStatsMap((prev) => {
+        const existing = prev[subscriptionId]
+        if (!existing) return prev
+        return {
+          ...prev,
+          [subscriptionId]: {
+            ...existing,
+            upcomingPrice: result.price,
+            upcomingPriceEffectiveFrom: result.effectiveFrom,
+          },
+        }
+      })
+
+      setPriceTarget(null)
+      setPriceInput('')
+      Alert.alert(
+        'Price scheduled',
+        `The new price of ${formatCurrency(result.price)} takes effect on ${formatLongDate(new Date(result.effectiveFrom))}.`
+      )
+      loadSubscriptions()
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to update the price.')
+    } finally {
+      setSavingPrice(false)
+    }
+  }
+
   const getDaysUsed = (start: string, end: string | null) => {
     const startDate = new Date(start)
     startDate.setHours(0, 0, 0, 0)
@@ -112,10 +248,36 @@ export default function CustomerSubscriptionsScreen() {
           <Text style={[styles.productName, isStopped && styles.stoppedProductName]} numberOfLines={1}>
             {item.product.productName}
           </Text>
-          <View style={[styles.badge, isStopped ? styles.stoppedBadge : styles.activeBadge]}>
-            <Text style={[styles.badgeText, isStopped ? styles.stoppedBadgeText : styles.activeBadgeText]}>
-              {isStopped ? "Stopped" : "Active"}
-            </Text>
+          <View style={styles.headerRight}>
+            <View style={[styles.badge, isStopped ? styles.stoppedBadge : styles.activeBadge]}>
+              <Text style={[styles.badgeText, isStopped ? styles.stoppedBadgeText : styles.activeBadgeText]}>
+                {isStopped ? "Stopped" : "Active"}
+              </Text>
+            </View>
+            {!isStopped && (
+              <TouchableOpacity
+                style={styles.editIconButton}
+                onPress={() => openPriceModal(item)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Change the price of ${item.product.productName} for ${customerName}`}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Feather name="edit-2" size={16} color="#2563EB" />
+              </TouchableOpacity>
+            )}
+            {isStopped && (
+              <TouchableOpacity
+                style={styles.deleteIconButton}
+                onPress={() => handleDeletePress(item)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete ${item.product.productName} subscription record`}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Feather name="trash-2" size={18} color="#DC2626" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -177,7 +339,7 @@ export default function CustomerSubscriptionsScreen() {
         <View style={styles.revenueBanner}>
           <View style={styles.revenueTile}>
             <Text style={styles.revenueTileLabel}>Price / Unit</Text>
-            <Text style={styles.revenueTileValue}>{formatCurrency(item.price)}</Text>
+            <Text style={styles.revenueTileValue}>{formatCurrency(stats ? stats.price : item.price)}</Text>
           </View>
           <View style={styles.revenueDivider} />
           <View style={styles.revenueTile}>
@@ -190,6 +352,15 @@ export default function CustomerSubscriptionsScreen() {
             <Text style={styles.revenueTileValueStrong}>{stats ? formatCurrency(stats.totalRevenue) : '—'}</Text>
           </View>
         </View>
+
+        {stats?.upcomingPrice && stats.upcomingPriceEffectiveFrom && (
+          <View style={styles.upcomingPriceNote}>
+            <Feather name="clock" size={14} color="#B45309" />
+            <Text style={styles.upcomingPriceText}>
+              New price {formatCurrency(stats.upcomingPrice)} from {formatLongDate(new Date(stats.upcomingPriceEffectiveFrom))}
+            </Text>
+          </View>
+        )}
 
         <TouchableOpacity
           style={styles.calendarButton}
@@ -242,6 +413,105 @@ export default function CustomerSubscriptionsScreen() {
         }
         renderItem={renderSubscription}
       />
+
+      <Modal
+        visible={priceTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={closePriceModal}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>Update price</Text>
+                <Text style={styles.modalSubtitle} numberOfLines={1}>
+                  {priceTarget?.product.productName} · {customerName}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={closePriceModal}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Feather name="x" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>
+              Price per {priceTarget?.product.unit?.toLowerCase() ?? 'unit'} (₹)
+            </Text>
+            <TextInput
+              style={styles.priceInput}
+              value={priceInput}
+              onChangeText={setPriceInput}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor="#B4B2A9"
+              editable={!savingPrice}
+            />
+
+            <Text style={styles.inputLabel}>Apply from</Text>
+            <View style={styles.timingRow}>
+              {([
+                { key: 'NEXT_DAY' as PriceEffectiveFrom, title: 'From tomorrow', caption: formatLongDate(resolveEffectiveDate('NEXT_DAY')) },
+                { key: 'NEXT_MONTH' as PriceEffectiveFrom, title: 'From next month', caption: formatLongDate(resolveEffectiveDate('NEXT_MONTH')) },
+              ]).map((option) => {
+                const selected = priceTiming === option.key
+                return (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[styles.timingOption, selected && styles.timingOptionSelected]}
+                    onPress={() => setPriceTiming(option.key)}
+                    activeOpacity={0.8}
+                    disabled={savingPrice}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={[styles.timingTitle, selected && styles.timingTitleSelected]}>
+                      {option.title}
+                    </Text>
+                    <Text style={[styles.timingCaption, selected && styles.timingCaptionSelected]}>
+                      {option.caption}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+
+            <Text style={styles.modalHint}>
+              Deliveries before the start date keep the current price, so revenue you have already earned does not change.
+            </Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={closePriceModal}
+                activeOpacity={0.8}
+                disabled={savingPrice}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveButton, savingPrice && styles.modalSaveButtonDisabled]}
+                onPress={handleSavePrice}
+                activeOpacity={0.8}
+                disabled={savingPrice}
+              >
+                {savingPrice ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSaveText}>Save price</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -316,6 +586,175 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  deleteIconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  editIconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  upcomingPriceNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  upcomingPriceText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: "#92400E",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
+    justifyContent: "center",
+    paddingHorizontal: 22,
+  },
+  modalCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 19,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#64748B",
+    marginTop: 2,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+    marginBottom: 8,
+  },
+  priceInput: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginBottom: 18,
+  },
+  timingRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  timingOption: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: "center",
+  },
+  timingOptionSelected: {
+    borderColor: "#2563EB",
+    backgroundColor: "#EFF6FF",
+  },
+  timingTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#475569",
+    textAlign: "center",
+  },
+  timingTitleSelected: {
+    color: "#1D4ED8",
+  },
+  timingCaption: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#94A3B8",
+    marginTop: 3,
+    textAlign: "center",
+  },
+  timingCaptionSelected: {
+    color: "#2563EB",
+  },
+  modalHint: {
+    marginTop: 14,
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#64748B",
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 18,
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+    alignItems: "center",
+  },
+  modalCancelText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#475569",
+  },
+  modalSaveButton: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 14,
+    backgroundColor: "#2563EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalSaveButtonDisabled: {
+    opacity: 0.7,
+  },
+  modalSaveText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#FFFFFF",
   },
   productName: {
     flex: 1,
@@ -457,23 +896,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: "#065F46",
     textAlign: "center",
-  },
-  deleteButton: {
-    marginTop: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#FEF2F2",
-    borderWidth: 1,
-    borderColor: "#FECACA",
-    paddingVertical: 12,
-    borderRadius: 14,
-  },
-  deleteButtonText: {
-    color: "#A32D2D",
-    fontSize: 14,
-    fontWeight: "800",
   },
   calendarIcon: {
     fontSize: 16,

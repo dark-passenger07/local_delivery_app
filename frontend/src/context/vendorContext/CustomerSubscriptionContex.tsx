@@ -98,6 +98,9 @@ export interface VendorSubscriptionStats {
   receivedDays: number
   skippedDays: number
   price: string
+  /** A price the vendor scheduled that has not taken effect yet, if any. */
+  upcomingPrice: string | null
+  upcomingPriceEffectiveFrom: string | null
   monthlyRevenue: string
   totalRevenue: string
 }
@@ -115,6 +118,8 @@ export interface VendorRevenueItem {
   productName: string
   productUnit: string
   price: string
+  upcomingPrice: string | null
+  upcomingPriceEffectiveFrom: string | null
   deliveredQuantity: string
   revenue: string
   status: string
@@ -127,6 +132,21 @@ interface VendorTotalRevenueResponse {
   success: boolean
   totalRevenue: string
   items: VendorRevenueItem[]
+}
+
+/** When a new per-unit price starts applying. */
+export type PriceEffectiveFrom = "NEXT_DAY" | "NEXT_MONTH"
+
+export interface UpdatedPriceResult {
+  price: string
+  effectiveFrom: string
+}
+
+interface UpdatePriceResponse {
+  message: string
+  success: boolean
+  price: string
+  effectiveFrom: string
 }
 
 interface CustomerSubscriptionState {
@@ -145,6 +165,8 @@ interface CustomerSubscriptionState {
   revenueItems: VendorRevenueItem[];
   revenueLoading: boolean;
   fetchVendorTotalRevenue: () => Promise<void>;
+  deleteStoppedSubscription: (subscriptionId: string) => Promise<void>;
+  updateSubscriptionPrice: (subscriptionId: string, price: number, effectiveFrom: PriceEffectiveFrom) => Promise<UpdatedPriceResult>;
   error: any
 }
 
@@ -249,6 +271,58 @@ export const useCustomerSubscriptionStore = create<CustomerSubscriptionState>()(
       throw new Error(message)
     } finally {
       set({ revenueLoading: false })
+    }
+  },
+
+  deleteStoppedSubscription: async (subscriptionId: string) => {
+    try {
+      const res = await axiosInstance.delete(`/subscription/vendor/subscription/${subscriptionId}`)
+      if (res.data.success) {
+        // Drop the deleted subscription everywhere it may be cached so the UI is
+        // immediately consistent (Total Revenue recomputes without a refetch).
+        set((state) => {
+          const remainingItems = state.revenueItems.filter((i) => i.subscriptionId !== subscriptionId)
+          const recomputedTotal = remainingItems.reduce((sum, i) => sum + (parseFloat(i.revenue) || 0), 0)
+          return {
+            revenueItems: remainingItems,
+            totalRevenue: recomputedTotal.toString(),
+            subscribedProducts: state.subscribedProducts.filter((p) => p.id !== subscriptionId),
+          }
+        })
+      }
+    } catch (error: any) {
+      const message = error?.response?.data?.message ?? error?.response?.data?.error ?? error.message ?? "Failed to delete subscription"
+      set({ error: message })
+      throw new Error(message)
+    }
+  },
+
+  updateSubscriptionPrice: async (subscriptionId: string, price: number, effectiveFrom: PriceEffectiveFrom) => {
+    try {
+      const res = await axiosInstance.patch<UpdatePriceResponse>(
+        `/subscription/vendor/subscription/${subscriptionId}/price`,
+        { price, effectiveFrom }
+      )
+      if (!res.data.success) {
+        throw new Error(res.data.message ?? "Failed to update price")
+      }
+
+      // A new price always starts tomorrow at the earliest, so it is scheduled,
+      // not current — revenue already earned keeps the old price. Reflect it as
+      // the upcoming price on anything cached so the UI updates without a refetch.
+      set((state) => ({
+        revenueItems: state.revenueItems.map((i) =>
+          i.subscriptionId === subscriptionId
+            ? { ...i, upcomingPrice: res.data.price, upcomingPriceEffectiveFrom: res.data.effectiveFrom }
+            : i
+        ),
+      }))
+
+      return { price: res.data.price, effectiveFrom: res.data.effectiveFrom }
+    } catch (error: any) {
+      const message = error?.response?.data?.message ?? error?.response?.data?.error ?? error.message ?? "Failed to update price"
+      set({ error: message })
+      throw new Error(message)
     }
   }
 }))

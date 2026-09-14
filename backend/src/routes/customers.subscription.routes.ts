@@ -12,6 +12,8 @@ import {
   getVendorTotalRevenue,
   getVendorDailyDeliveryReport,
   getVendorSubscriptionHistory,
+  deleteStoppedSubscription,
+  updateSubscriptionPrice,
 } from "../controllers/customerSubscription.controlers.js"
 import { isAuthenticated } from "../middlewares/isAuthenticated.js"
 import { isCreatedVendorProfile } from "../middlewares/isCreatedVendorProfile.js"
@@ -40,5 +42,11 @@ customerSubscriptionRouter.get("/vendor/stats/:id", isAuthenticated, isCreatedVe
 customerSubscriptionRouter.get("/vendor/total-revenue", isAuthenticated, isCreatedVendorProfile, isVendor, getVendorTotalRevenue)
 customerSubscriptionRouter.get("/vendor/daily-delivery-report", isAuthenticated, isCreatedVendorProfile, isVendor, getVendorDailyDeliveryReport)
 customerSubscriptionRouter.get("/vendor/subscription-history", isAuthenticated, isCreatedVendorProfile, isVendor, getVendorSubscriptionHistory)
+
+// vendor deletes an unsubscribed (STOPPED) customer subscription record
+customerSubscriptionRouter.delete("/vendor/subscription/:id", isAuthenticated, isCreatedVendorProfile, isVendor, deleteStoppedSubscription)
+
+// vendor updates the per-unit price for one customer's subscription (from tomorrow or from the 1st of next month)
+customerSubscriptionRouter.patch("/vendor/subscription/:id/price", isAuthenticated, isCreatedVendorProfile, isVendor, updateSubscriptionPrice)
 
 export default customerSubscriptionRouter
