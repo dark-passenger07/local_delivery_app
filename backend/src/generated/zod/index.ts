@@ -43,6 +43,8 @@ export const VendorCustomersScalarFieldEnumSchema = z.enum(['id','vendorId','cus
 
 export const CustomerSubscriptionScalarFieldEnumSchema = z.enum(['id','vendorCustomerId','productId','startDate','endDate','dailyQuantity','price','status','createdAt','updatedAt']);
 
+export const SubscriptionPriceScalarFieldEnumSchema = z.enum(['id','subscriptionId','price','effectiveFrom','createdAt','updatedAt']);
+
 export const SubscriptionHistoryScalarFieldEnumSchema = z.enum(['id','subscriptionId','customerId','customerName','productId','productName','vendorId','vendorName','startDate','endDate','durationDays','status','createdAt','updatedAt']);
 
 export const RequestsScalarFieldEnumSchema = z.enum(['id','vendorCustomerId','productId','subscriptionId','type','message','start_date','end_date','requestedQuantity','status','respondedAt','createdAt','updatedAt']);
@@ -167,6 +169,33 @@ export const CustomerSubscriptionSchema = z.object({
 })
 
 export type CustomerSubscription = z.infer<typeof CustomerSubscriptionSchema>
+
+/////////////////////////////////////////
+// SUBSCRIPTION PRICE SCHEMA
+/////////////////////////////////////////
+
+/**
+ * Price history for a subscription. The vendor can change a customer's
+ * per-unit price effective from a future date (next day, or the 1st of next
+ * month), so revenue for any given day is priced with the row whose
+ * effectiveFrom is the latest date on or before that day. This keeps revenue
+ * already earned at the old price intact instead of retroactively repricing it.
+ * Subscriptions created before this table existed have no rows and fall back
+ * to CustomerSubscription.price.
+ */
+export const SubscriptionPriceSchema = z.object({
+  id: z.uuid(),
+  subscriptionId: z.string(),
+  price: z.instanceof(Prisma.Decimal, { message: "Field 'price' must be a Decimal. Location: ['Models', 'SubscriptionPrice']"}),
+  /**
+   * Midnight (00:00) of the first day this price applies to.
+   */
+  effectiveFrom: z.coerce.date(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+})
+
+export type SubscriptionPrice = z.infer<typeof SubscriptionPriceSchema>
 
 /////////////////////////////////////////
 // SUBSCRIPTION HISTORY SCHEMA
@@ -395,6 +424,7 @@ export const CustomerSubscriptionIncludeSchema: z.ZodType<Prisma.CustomerSubscri
   product: z.union([z.boolean(),z.lazy(() => ProductArgsSchema)]).optional(),
   requests: z.union([z.boolean(),z.lazy(() => RequestsFindManyArgsSchema)]).optional(),
   subscriptionHistory: z.union([z.boolean(),z.lazy(() => SubscriptionHistoryFindManyArgsSchema)]).optional(),
+  prices: z.union([z.boolean(),z.lazy(() => SubscriptionPriceFindManyArgsSchema)]).optional(),
   _count: z.union([z.boolean(),z.lazy(() => CustomerSubscriptionCountOutputTypeArgsSchema)]).optional(),
 }).strict();
 
@@ -410,6 +440,7 @@ export const CustomerSubscriptionCountOutputTypeArgsSchema: z.ZodType<Prisma.Cus
 export const CustomerSubscriptionCountOutputTypeSelectSchema: z.ZodType<Prisma.CustomerSubscriptionCountOutputTypeSelect> = z.object({
   requests: z.boolean().optional(),
   subscriptionHistory: z.boolean().optional(),
+  prices: z.boolean().optional(),
 }).strict();
 
 export const CustomerSubscriptionSelectSchema: z.ZodType<Prisma.CustomerSubscriptionSelect> = z.object({
@@ -427,7 +458,30 @@ export const CustomerSubscriptionSelectSchema: z.ZodType<Prisma.CustomerSubscrip
   product: z.union([z.boolean(),z.lazy(() => ProductArgsSchema)]).optional(),
   requests: z.union([z.boolean(),z.lazy(() => RequestsFindManyArgsSchema)]).optional(),
   subscriptionHistory: z.union([z.boolean(),z.lazy(() => SubscriptionHistoryFindManyArgsSchema)]).optional(),
+  prices: z.union([z.boolean(),z.lazy(() => SubscriptionPriceFindManyArgsSchema)]).optional(),
   _count: z.union([z.boolean(),z.lazy(() => CustomerSubscriptionCountOutputTypeArgsSchema)]).optional(),
+}).strict()
+
+// SUBSCRIPTION PRICE
+//------------------------------------------------------
+
+export const SubscriptionPriceIncludeSchema: z.ZodType<Prisma.SubscriptionPriceInclude> = z.object({
+  subscription: z.union([z.boolean(),z.lazy(() => CustomerSubscriptionArgsSchema)]).optional(),
+}).strict();
+
+export const SubscriptionPriceArgsSchema: z.ZodType<Prisma.SubscriptionPriceDefaultArgs> = z.object({
+  select: z.lazy(() => SubscriptionPriceSelectSchema).optional(),
+  include: z.lazy(() => SubscriptionPriceIncludeSchema).optional(),
+}).strict();
+
+export const SubscriptionPriceSelectSchema: z.ZodType<Prisma.SubscriptionPriceSelect> = z.object({
+  id: z.boolean().optional(),
+  subscriptionId: z.boolean().optional(),
+  price: z.boolean().optional(),
+  effectiveFrom: z.boolean().optional(),
+  createdAt: z.boolean().optional(),
+  updatedAt: z.boolean().optional(),
+  subscription: z.union([z.boolean(),z.lazy(() => CustomerSubscriptionArgsSchema)]).optional(),
 }).strict()
 
 // SUBSCRIPTION HISTORY
@@ -854,6 +908,7 @@ export const CustomerSubscriptionWhereInputSchema: z.ZodType<Prisma.CustomerSubs
   product: z.union([ z.lazy(() => ProductScalarRelationFilterSchema), z.lazy(() => ProductWhereInputSchema) ]).optional(),
   requests: z.lazy(() => RequestsListRelationFilterSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryListRelationFilterSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceListRelationFilterSchema).optional(),
 });
 
 export const CustomerSubscriptionOrderByWithRelationInputSchema: z.ZodType<Prisma.CustomerSubscriptionOrderByWithRelationInput> = z.strictObject({
@@ -871,6 +926,7 @@ export const CustomerSubscriptionOrderByWithRelationInputSchema: z.ZodType<Prism
   product: z.lazy(() => ProductOrderByWithRelationInputSchema).optional(),
   requests: z.lazy(() => RequestsOrderByRelationAggregateInputSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryOrderByRelationAggregateInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceOrderByRelationAggregateInputSchema).optional(),
 });
 
 export const CustomerSubscriptionWhereUniqueInputSchema: z.ZodType<Prisma.CustomerSubscriptionWhereUniqueInput> = z.object({
@@ -894,6 +950,7 @@ export const CustomerSubscriptionWhereUniqueInputSchema: z.ZodType<Prisma.Custom
   product: z.union([ z.lazy(() => ProductScalarRelationFilterSchema), z.lazy(() => ProductWhereInputSchema) ]).optional(),
   requests: z.lazy(() => RequestsListRelationFilterSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryListRelationFilterSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceListRelationFilterSchema).optional(),
 }));
 
 export const CustomerSubscriptionOrderByWithAggregationInputSchema: z.ZodType<Prisma.CustomerSubscriptionOrderByWithAggregationInput> = z.strictObject({
@@ -926,6 +983,81 @@ export const CustomerSubscriptionScalarWhereWithAggregatesInputSchema: z.ZodType
   dailyQuantity: z.union([ z.lazy(() => DecimalWithAggregatesFilterSchema), z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }) ]).optional(),
   price: z.union([ z.lazy(() => DecimalWithAggregatesFilterSchema), z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }) ]).optional(),
   status: z.union([ z.lazy(() => EnumSubscriptionStatusWithAggregatesFilterSchema), z.lazy(() => SubscriptionStatusSchema) ]).optional(),
+  createdAt: z.union([ z.lazy(() => DateTimeWithAggregatesFilterSchema), z.coerce.date() ]).optional(),
+  updatedAt: z.union([ z.lazy(() => DateTimeWithAggregatesFilterSchema), z.coerce.date() ]).optional(),
+});
+
+export const SubscriptionPriceWhereInputSchema: z.ZodType<Prisma.SubscriptionPriceWhereInput> = z.strictObject({
+  AND: z.union([ z.lazy(() => SubscriptionPriceWhereInputSchema), z.lazy(() => SubscriptionPriceWhereInputSchema).array() ]).optional(),
+  OR: z.lazy(() => SubscriptionPriceWhereInputSchema).array().optional(),
+  NOT: z.union([ z.lazy(() => SubscriptionPriceWhereInputSchema), z.lazy(() => SubscriptionPriceWhereInputSchema).array() ]).optional(),
+  id: z.union([ z.lazy(() => StringFilterSchema), z.string() ]).optional(),
+  subscriptionId: z.union([ z.lazy(() => StringFilterSchema), z.string() ]).optional(),
+  price: z.union([ z.lazy(() => DecimalFilterSchema), z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }) ]).optional(),
+  effectiveFrom: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+  createdAt: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+  updatedAt: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+  subscription: z.union([ z.lazy(() => CustomerSubscriptionScalarRelationFilterSchema), z.lazy(() => CustomerSubscriptionWhereInputSchema) ]).optional(),
+});
+
+export const SubscriptionPriceOrderByWithRelationInputSchema: z.ZodType<Prisma.SubscriptionPriceOrderByWithRelationInput> = z.strictObject({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  subscriptionId: z.lazy(() => SortOrderSchema).optional(),
+  price: z.lazy(() => SortOrderSchema).optional(),
+  effectiveFrom: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional(),
+  updatedAt: z.lazy(() => SortOrderSchema).optional(),
+  subscription: z.lazy(() => CustomerSubscriptionOrderByWithRelationInputSchema).optional(),
+});
+
+export const SubscriptionPriceWhereUniqueInputSchema: z.ZodType<Prisma.SubscriptionPriceWhereUniqueInput> = z.union([
+  z.object({
+    id: z.uuid(),
+    subscriptionId_effectiveFrom: z.lazy(() => SubscriptionPriceSubscriptionIdEffectiveFromCompoundUniqueInputSchema),
+  }),
+  z.object({
+    id: z.uuid(),
+  }),
+  z.object({
+    subscriptionId_effectiveFrom: z.lazy(() => SubscriptionPriceSubscriptionIdEffectiveFromCompoundUniqueInputSchema),
+  }),
+])
+.and(z.strictObject({
+  id: z.uuid().optional(),
+  subscriptionId_effectiveFrom: z.lazy(() => SubscriptionPriceSubscriptionIdEffectiveFromCompoundUniqueInputSchema).optional(),
+  AND: z.union([ z.lazy(() => SubscriptionPriceWhereInputSchema), z.lazy(() => SubscriptionPriceWhereInputSchema).array() ]).optional(),
+  OR: z.lazy(() => SubscriptionPriceWhereInputSchema).array().optional(),
+  NOT: z.union([ z.lazy(() => SubscriptionPriceWhereInputSchema), z.lazy(() => SubscriptionPriceWhereInputSchema).array() ]).optional(),
+  subscriptionId: z.union([ z.lazy(() => StringFilterSchema), z.string() ]).optional(),
+  price: z.union([ z.lazy(() => DecimalFilterSchema), z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }) ]).optional(),
+  effectiveFrom: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+  createdAt: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+  updatedAt: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+  subscription: z.union([ z.lazy(() => CustomerSubscriptionScalarRelationFilterSchema), z.lazy(() => CustomerSubscriptionWhereInputSchema) ]).optional(),
+}));
+
+export const SubscriptionPriceOrderByWithAggregationInputSchema: z.ZodType<Prisma.SubscriptionPriceOrderByWithAggregationInput> = z.strictObject({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  subscriptionId: z.lazy(() => SortOrderSchema).optional(),
+  price: z.lazy(() => SortOrderSchema).optional(),
+  effectiveFrom: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional(),
+  updatedAt: z.lazy(() => SortOrderSchema).optional(),
+  _count: z.lazy(() => SubscriptionPriceCountOrderByAggregateInputSchema).optional(),
+  _avg: z.lazy(() => SubscriptionPriceAvgOrderByAggregateInputSchema).optional(),
+  _max: z.lazy(() => SubscriptionPriceMaxOrderByAggregateInputSchema).optional(),
+  _min: z.lazy(() => SubscriptionPriceMinOrderByAggregateInputSchema).optional(),
+  _sum: z.lazy(() => SubscriptionPriceSumOrderByAggregateInputSchema).optional(),
+});
+
+export const SubscriptionPriceScalarWhereWithAggregatesInputSchema: z.ZodType<Prisma.SubscriptionPriceScalarWhereWithAggregatesInput> = z.strictObject({
+  AND: z.union([ z.lazy(() => SubscriptionPriceScalarWhereWithAggregatesInputSchema), z.lazy(() => SubscriptionPriceScalarWhereWithAggregatesInputSchema).array() ]).optional(),
+  OR: z.lazy(() => SubscriptionPriceScalarWhereWithAggregatesInputSchema).array().optional(),
+  NOT: z.union([ z.lazy(() => SubscriptionPriceScalarWhereWithAggregatesInputSchema), z.lazy(() => SubscriptionPriceScalarWhereWithAggregatesInputSchema).array() ]).optional(),
+  id: z.union([ z.lazy(() => StringWithAggregatesFilterSchema), z.string() ]).optional(),
+  subscriptionId: z.union([ z.lazy(() => StringWithAggregatesFilterSchema), z.string() ]).optional(),
+  price: z.union([ z.lazy(() => DecimalWithAggregatesFilterSchema), z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }) ]).optional(),
+  effectiveFrom: z.union([ z.lazy(() => DateTimeWithAggregatesFilterSchema), z.coerce.date() ]).optional(),
   createdAt: z.union([ z.lazy(() => DateTimeWithAggregatesFilterSchema), z.coerce.date() ]).optional(),
   updatedAt: z.union([ z.lazy(() => DateTimeWithAggregatesFilterSchema), z.coerce.date() ]).optional(),
 });
@@ -1519,6 +1651,7 @@ export const CustomerSubscriptionCreateInputSchema: z.ZodType<Prisma.CustomerSub
   product: z.lazy(() => ProductCreateNestedOneWithoutSubscriptionInputSchema),
   requests: z.lazy(() => RequestsCreateNestedManyWithoutSubscriptionInputSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryCreateNestedManyWithoutSubscriptionInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceCreateNestedManyWithoutSubscriptionInputSchema).optional(),
 });
 
 export const CustomerSubscriptionUncheckedCreateInputSchema: z.ZodType<Prisma.CustomerSubscriptionUncheckedCreateInput> = z.strictObject({
@@ -1534,6 +1667,7 @@ export const CustomerSubscriptionUncheckedCreateInputSchema: z.ZodType<Prisma.Cu
   updatedAt: z.coerce.date().optional(),
   requests: z.lazy(() => RequestsUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
 });
 
 export const CustomerSubscriptionUpdateInputSchema: z.ZodType<Prisma.CustomerSubscriptionUpdateInput> = z.strictObject({
@@ -1549,6 +1683,7 @@ export const CustomerSubscriptionUpdateInputSchema: z.ZodType<Prisma.CustomerSub
   product: z.lazy(() => ProductUpdateOneRequiredWithoutSubscriptionNestedInputSchema).optional(),
   requests: z.lazy(() => RequestsUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
 });
 
 export const CustomerSubscriptionUncheckedUpdateInputSchema: z.ZodType<Prisma.CustomerSubscriptionUncheckedUpdateInput> = z.strictObject({
@@ -1564,6 +1699,7 @@ export const CustomerSubscriptionUncheckedUpdateInputSchema: z.ZodType<Prisma.Cu
   updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
   requests: z.lazy(() => RequestsUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
 });
 
 export const CustomerSubscriptionCreateManyInputSchema: z.ZodType<Prisma.CustomerSubscriptionCreateManyInput> = z.strictObject({
@@ -1599,6 +1735,68 @@ export const CustomerSubscriptionUncheckedUpdateManyInputSchema: z.ZodType<Prism
   dailyQuantity: z.union([ z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),z.lazy(() => DecimalFieldUpdateOperationsInputSchema) ]).optional(),
   price: z.union([ z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),z.lazy(() => DecimalFieldUpdateOperationsInputSchema) ]).optional(),
   status: z.union([ z.lazy(() => SubscriptionStatusSchema), z.lazy(() => EnumSubscriptionStatusFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+});
+
+export const SubscriptionPriceCreateInputSchema: z.ZodType<Prisma.SubscriptionPriceCreateInput> = z.strictObject({
+  id: z.uuid().optional(),
+  price: z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),
+  effectiveFrom: z.coerce.date(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+  subscription: z.lazy(() => CustomerSubscriptionCreateNestedOneWithoutPricesInputSchema),
+});
+
+export const SubscriptionPriceUncheckedCreateInputSchema: z.ZodType<Prisma.SubscriptionPriceUncheckedCreateInput> = z.strictObject({
+  id: z.uuid().optional(),
+  subscriptionId: z.string(),
+  price: z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),
+  effectiveFrom: z.coerce.date(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+});
+
+export const SubscriptionPriceUpdateInputSchema: z.ZodType<Prisma.SubscriptionPriceUpdateInput> = z.strictObject({
+  id: z.union([ z.uuid(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  price: z.union([ z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),z.lazy(() => DecimalFieldUpdateOperationsInputSchema) ]).optional(),
+  effectiveFrom: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  subscription: z.lazy(() => CustomerSubscriptionUpdateOneRequiredWithoutPricesNestedInputSchema).optional(),
+});
+
+export const SubscriptionPriceUncheckedUpdateInputSchema: z.ZodType<Prisma.SubscriptionPriceUncheckedUpdateInput> = z.strictObject({
+  id: z.union([ z.uuid(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  subscriptionId: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  price: z.union([ z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),z.lazy(() => DecimalFieldUpdateOperationsInputSchema) ]).optional(),
+  effectiveFrom: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+});
+
+export const SubscriptionPriceCreateManyInputSchema: z.ZodType<Prisma.SubscriptionPriceCreateManyInput> = z.strictObject({
+  id: z.uuid().optional(),
+  subscriptionId: z.string(),
+  price: z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),
+  effectiveFrom: z.coerce.date(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+});
+
+export const SubscriptionPriceUpdateManyMutationInputSchema: z.ZodType<Prisma.SubscriptionPriceUpdateManyMutationInput> = z.strictObject({
+  id: z.union([ z.uuid(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  price: z.union([ z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),z.lazy(() => DecimalFieldUpdateOperationsInputSchema) ]).optional(),
+  effectiveFrom: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+});
+
+export const SubscriptionPriceUncheckedUpdateManyInputSchema: z.ZodType<Prisma.SubscriptionPriceUncheckedUpdateManyInput> = z.strictObject({
+  id: z.union([ z.uuid(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  subscriptionId: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  price: z.union([ z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),z.lazy(() => DecimalFieldUpdateOperationsInputSchema) ]).optional(),
+  effectiveFrom: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
   createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
   updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
 });
@@ -2206,12 +2404,22 @@ export const SubscriptionHistoryListRelationFilterSchema: z.ZodType<Prisma.Subsc
   none: z.lazy(() => SubscriptionHistoryWhereInputSchema).optional(),
 });
 
+export const SubscriptionPriceListRelationFilterSchema: z.ZodType<Prisma.SubscriptionPriceListRelationFilter> = z.strictObject({
+  every: z.lazy(() => SubscriptionPriceWhereInputSchema).optional(),
+  some: z.lazy(() => SubscriptionPriceWhereInputSchema).optional(),
+  none: z.lazy(() => SubscriptionPriceWhereInputSchema).optional(),
+});
+
 export const SortOrderInputSchema: z.ZodType<Prisma.SortOrderInput> = z.strictObject({
   sort: z.lazy(() => SortOrderSchema),
   nulls: z.lazy(() => NullsOrderSchema).optional(),
 });
 
 export const SubscriptionHistoryOrderByRelationAggregateInputSchema: z.ZodType<Prisma.SubscriptionHistoryOrderByRelationAggregateInput> = z.strictObject({
+  _count: z.lazy(() => SortOrderSchema).optional(),
+});
+
+export const SubscriptionPriceOrderByRelationAggregateInputSchema: z.ZodType<Prisma.SubscriptionPriceOrderByRelationAggregateInput> = z.strictObject({
   _count: z.lazy(() => SortOrderSchema).optional(),
 });
 
@@ -2304,6 +2512,51 @@ export const EnumSubscriptionStatusWithAggregatesFilterSchema: z.ZodType<Prisma.
   _max: z.lazy(() => NestedEnumSubscriptionStatusFilterSchema).optional(),
 });
 
+export const CustomerSubscriptionScalarRelationFilterSchema: z.ZodType<Prisma.CustomerSubscriptionScalarRelationFilter> = z.strictObject({
+  is: z.lazy(() => CustomerSubscriptionWhereInputSchema).optional(),
+  isNot: z.lazy(() => CustomerSubscriptionWhereInputSchema).optional(),
+});
+
+export const SubscriptionPriceSubscriptionIdEffectiveFromCompoundUniqueInputSchema: z.ZodType<Prisma.SubscriptionPriceSubscriptionIdEffectiveFromCompoundUniqueInput> = z.strictObject({
+  subscriptionId: z.string(),
+  effectiveFrom: z.coerce.date(),
+});
+
+export const SubscriptionPriceCountOrderByAggregateInputSchema: z.ZodType<Prisma.SubscriptionPriceCountOrderByAggregateInput> = z.strictObject({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  subscriptionId: z.lazy(() => SortOrderSchema).optional(),
+  price: z.lazy(() => SortOrderSchema).optional(),
+  effectiveFrom: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional(),
+  updatedAt: z.lazy(() => SortOrderSchema).optional(),
+});
+
+export const SubscriptionPriceAvgOrderByAggregateInputSchema: z.ZodType<Prisma.SubscriptionPriceAvgOrderByAggregateInput> = z.strictObject({
+  price: z.lazy(() => SortOrderSchema).optional(),
+});
+
+export const SubscriptionPriceMaxOrderByAggregateInputSchema: z.ZodType<Prisma.SubscriptionPriceMaxOrderByAggregateInput> = z.strictObject({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  subscriptionId: z.lazy(() => SortOrderSchema).optional(),
+  price: z.lazy(() => SortOrderSchema).optional(),
+  effectiveFrom: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional(),
+  updatedAt: z.lazy(() => SortOrderSchema).optional(),
+});
+
+export const SubscriptionPriceMinOrderByAggregateInputSchema: z.ZodType<Prisma.SubscriptionPriceMinOrderByAggregateInput> = z.strictObject({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  subscriptionId: z.lazy(() => SortOrderSchema).optional(),
+  price: z.lazy(() => SortOrderSchema).optional(),
+  effectiveFrom: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional(),
+  updatedAt: z.lazy(() => SortOrderSchema).optional(),
+});
+
+export const SubscriptionPriceSumOrderByAggregateInputSchema: z.ZodType<Prisma.SubscriptionPriceSumOrderByAggregateInput> = z.strictObject({
+  price: z.lazy(() => SortOrderSchema).optional(),
+});
+
 export const IntFilterSchema: z.ZodType<Prisma.IntFilter> = z.strictObject({
   equals: z.number().optional(),
   in: z.number().array().optional(),
@@ -2313,11 +2566,6 @@ export const IntFilterSchema: z.ZodType<Prisma.IntFilter> = z.strictObject({
   gt: z.number().optional(),
   gte: z.number().optional(),
   not: z.union([ z.number(),z.lazy(() => NestedIntFilterSchema) ]).optional(),
-});
-
-export const CustomerSubscriptionScalarRelationFilterSchema: z.ZodType<Prisma.CustomerSubscriptionScalarRelationFilter> = z.strictObject({
-  is: z.lazy(() => CustomerSubscriptionWhereInputSchema).optional(),
-  isNot: z.lazy(() => CustomerSubscriptionWhereInputSchema).optional(),
 });
 
 export const SubscriptionHistoryCountOrderByAggregateInputSchema: z.ZodType<Prisma.SubscriptionHistoryCountOrderByAggregateInput> = z.strictObject({
@@ -3019,6 +3267,13 @@ export const SubscriptionHistoryCreateNestedManyWithoutSubscriptionInputSchema: 
   connect: z.union([ z.lazy(() => SubscriptionHistoryWhereUniqueInputSchema), z.lazy(() => SubscriptionHistoryWhereUniqueInputSchema).array() ]).optional(),
 });
 
+export const SubscriptionPriceCreateNestedManyWithoutSubscriptionInputSchema: z.ZodType<Prisma.SubscriptionPriceCreateNestedManyWithoutSubscriptionInput> = z.strictObject({
+  create: z.union([ z.lazy(() => SubscriptionPriceCreateWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceCreateWithoutSubscriptionInputSchema).array(), z.lazy(() => SubscriptionPriceUncheckedCreateWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceUncheckedCreateWithoutSubscriptionInputSchema).array() ]).optional(),
+  connectOrCreate: z.union([ z.lazy(() => SubscriptionPriceCreateOrConnectWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceCreateOrConnectWithoutSubscriptionInputSchema).array() ]).optional(),
+  createMany: z.lazy(() => SubscriptionPriceCreateManySubscriptionInputEnvelopeSchema).optional(),
+  connect: z.union([ z.lazy(() => SubscriptionPriceWhereUniqueInputSchema), z.lazy(() => SubscriptionPriceWhereUniqueInputSchema).array() ]).optional(),
+});
+
 export const RequestsUncheckedCreateNestedManyWithoutSubscriptionInputSchema: z.ZodType<Prisma.RequestsUncheckedCreateNestedManyWithoutSubscriptionInput> = z.strictObject({
   create: z.union([ z.lazy(() => RequestsCreateWithoutSubscriptionInputSchema), z.lazy(() => RequestsCreateWithoutSubscriptionInputSchema).array(), z.lazy(() => RequestsUncheckedCreateWithoutSubscriptionInputSchema), z.lazy(() => RequestsUncheckedCreateWithoutSubscriptionInputSchema).array() ]).optional(),
   connectOrCreate: z.union([ z.lazy(() => RequestsCreateOrConnectWithoutSubscriptionInputSchema), z.lazy(() => RequestsCreateOrConnectWithoutSubscriptionInputSchema).array() ]).optional(),
@@ -3031,6 +3286,13 @@ export const SubscriptionHistoryUncheckedCreateNestedManyWithoutSubscriptionInpu
   connectOrCreate: z.union([ z.lazy(() => SubscriptionHistoryCreateOrConnectWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionHistoryCreateOrConnectWithoutSubscriptionInputSchema).array() ]).optional(),
   createMany: z.lazy(() => SubscriptionHistoryCreateManySubscriptionInputEnvelopeSchema).optional(),
   connect: z.union([ z.lazy(() => SubscriptionHistoryWhereUniqueInputSchema), z.lazy(() => SubscriptionHistoryWhereUniqueInputSchema).array() ]).optional(),
+});
+
+export const SubscriptionPriceUncheckedCreateNestedManyWithoutSubscriptionInputSchema: z.ZodType<Prisma.SubscriptionPriceUncheckedCreateNestedManyWithoutSubscriptionInput> = z.strictObject({
+  create: z.union([ z.lazy(() => SubscriptionPriceCreateWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceCreateWithoutSubscriptionInputSchema).array(), z.lazy(() => SubscriptionPriceUncheckedCreateWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceUncheckedCreateWithoutSubscriptionInputSchema).array() ]).optional(),
+  connectOrCreate: z.union([ z.lazy(() => SubscriptionPriceCreateOrConnectWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceCreateOrConnectWithoutSubscriptionInputSchema).array() ]).optional(),
+  createMany: z.lazy(() => SubscriptionPriceCreateManySubscriptionInputEnvelopeSchema).optional(),
+  connect: z.union([ z.lazy(() => SubscriptionPriceWhereUniqueInputSchema), z.lazy(() => SubscriptionPriceWhereUniqueInputSchema).array() ]).optional(),
 });
 
 export const NullableDateTimeFieldUpdateOperationsInputSchema: z.ZodType<Prisma.NullableDateTimeFieldUpdateOperationsInput> = z.strictObject({
@@ -3093,6 +3355,20 @@ export const SubscriptionHistoryUpdateManyWithoutSubscriptionNestedInputSchema: 
   deleteMany: z.union([ z.lazy(() => SubscriptionHistoryScalarWhereInputSchema), z.lazy(() => SubscriptionHistoryScalarWhereInputSchema).array() ]).optional(),
 });
 
+export const SubscriptionPriceUpdateManyWithoutSubscriptionNestedInputSchema: z.ZodType<Prisma.SubscriptionPriceUpdateManyWithoutSubscriptionNestedInput> = z.strictObject({
+  create: z.union([ z.lazy(() => SubscriptionPriceCreateWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceCreateWithoutSubscriptionInputSchema).array(), z.lazy(() => SubscriptionPriceUncheckedCreateWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceUncheckedCreateWithoutSubscriptionInputSchema).array() ]).optional(),
+  connectOrCreate: z.union([ z.lazy(() => SubscriptionPriceCreateOrConnectWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceCreateOrConnectWithoutSubscriptionInputSchema).array() ]).optional(),
+  upsert: z.union([ z.lazy(() => SubscriptionPriceUpsertWithWhereUniqueWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceUpsertWithWhereUniqueWithoutSubscriptionInputSchema).array() ]).optional(),
+  createMany: z.lazy(() => SubscriptionPriceCreateManySubscriptionInputEnvelopeSchema).optional(),
+  set: z.union([ z.lazy(() => SubscriptionPriceWhereUniqueInputSchema), z.lazy(() => SubscriptionPriceWhereUniqueInputSchema).array() ]).optional(),
+  disconnect: z.union([ z.lazy(() => SubscriptionPriceWhereUniqueInputSchema), z.lazy(() => SubscriptionPriceWhereUniqueInputSchema).array() ]).optional(),
+  delete: z.union([ z.lazy(() => SubscriptionPriceWhereUniqueInputSchema), z.lazy(() => SubscriptionPriceWhereUniqueInputSchema).array() ]).optional(),
+  connect: z.union([ z.lazy(() => SubscriptionPriceWhereUniqueInputSchema), z.lazy(() => SubscriptionPriceWhereUniqueInputSchema).array() ]).optional(),
+  update: z.union([ z.lazy(() => SubscriptionPriceUpdateWithWhereUniqueWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceUpdateWithWhereUniqueWithoutSubscriptionInputSchema).array() ]).optional(),
+  updateMany: z.union([ z.lazy(() => SubscriptionPriceUpdateManyWithWhereWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceUpdateManyWithWhereWithoutSubscriptionInputSchema).array() ]).optional(),
+  deleteMany: z.union([ z.lazy(() => SubscriptionPriceScalarWhereInputSchema), z.lazy(() => SubscriptionPriceScalarWhereInputSchema).array() ]).optional(),
+});
+
 export const RequestsUncheckedUpdateManyWithoutSubscriptionNestedInputSchema: z.ZodType<Prisma.RequestsUncheckedUpdateManyWithoutSubscriptionNestedInput> = z.strictObject({
   create: z.union([ z.lazy(() => RequestsCreateWithoutSubscriptionInputSchema), z.lazy(() => RequestsCreateWithoutSubscriptionInputSchema).array(), z.lazy(() => RequestsUncheckedCreateWithoutSubscriptionInputSchema), z.lazy(() => RequestsUncheckedCreateWithoutSubscriptionInputSchema).array() ]).optional(),
   connectOrCreate: z.union([ z.lazy(() => RequestsCreateOrConnectWithoutSubscriptionInputSchema), z.lazy(() => RequestsCreateOrConnectWithoutSubscriptionInputSchema).array() ]).optional(),
@@ -3119,6 +3395,34 @@ export const SubscriptionHistoryUncheckedUpdateManyWithoutSubscriptionNestedInpu
   update: z.union([ z.lazy(() => SubscriptionHistoryUpdateWithWhereUniqueWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionHistoryUpdateWithWhereUniqueWithoutSubscriptionInputSchema).array() ]).optional(),
   updateMany: z.union([ z.lazy(() => SubscriptionHistoryUpdateManyWithWhereWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionHistoryUpdateManyWithWhereWithoutSubscriptionInputSchema).array() ]).optional(),
   deleteMany: z.union([ z.lazy(() => SubscriptionHistoryScalarWhereInputSchema), z.lazy(() => SubscriptionHistoryScalarWhereInputSchema).array() ]).optional(),
+});
+
+export const SubscriptionPriceUncheckedUpdateManyWithoutSubscriptionNestedInputSchema: z.ZodType<Prisma.SubscriptionPriceUncheckedUpdateManyWithoutSubscriptionNestedInput> = z.strictObject({
+  create: z.union([ z.lazy(() => SubscriptionPriceCreateWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceCreateWithoutSubscriptionInputSchema).array(), z.lazy(() => SubscriptionPriceUncheckedCreateWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceUncheckedCreateWithoutSubscriptionInputSchema).array() ]).optional(),
+  connectOrCreate: z.union([ z.lazy(() => SubscriptionPriceCreateOrConnectWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceCreateOrConnectWithoutSubscriptionInputSchema).array() ]).optional(),
+  upsert: z.union([ z.lazy(() => SubscriptionPriceUpsertWithWhereUniqueWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceUpsertWithWhereUniqueWithoutSubscriptionInputSchema).array() ]).optional(),
+  createMany: z.lazy(() => SubscriptionPriceCreateManySubscriptionInputEnvelopeSchema).optional(),
+  set: z.union([ z.lazy(() => SubscriptionPriceWhereUniqueInputSchema), z.lazy(() => SubscriptionPriceWhereUniqueInputSchema).array() ]).optional(),
+  disconnect: z.union([ z.lazy(() => SubscriptionPriceWhereUniqueInputSchema), z.lazy(() => SubscriptionPriceWhereUniqueInputSchema).array() ]).optional(),
+  delete: z.union([ z.lazy(() => SubscriptionPriceWhereUniqueInputSchema), z.lazy(() => SubscriptionPriceWhereUniqueInputSchema).array() ]).optional(),
+  connect: z.union([ z.lazy(() => SubscriptionPriceWhereUniqueInputSchema), z.lazy(() => SubscriptionPriceWhereUniqueInputSchema).array() ]).optional(),
+  update: z.union([ z.lazy(() => SubscriptionPriceUpdateWithWhereUniqueWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceUpdateWithWhereUniqueWithoutSubscriptionInputSchema).array() ]).optional(),
+  updateMany: z.union([ z.lazy(() => SubscriptionPriceUpdateManyWithWhereWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceUpdateManyWithWhereWithoutSubscriptionInputSchema).array() ]).optional(),
+  deleteMany: z.union([ z.lazy(() => SubscriptionPriceScalarWhereInputSchema), z.lazy(() => SubscriptionPriceScalarWhereInputSchema).array() ]).optional(),
+});
+
+export const CustomerSubscriptionCreateNestedOneWithoutPricesInputSchema: z.ZodType<Prisma.CustomerSubscriptionCreateNestedOneWithoutPricesInput> = z.strictObject({
+  create: z.union([ z.lazy(() => CustomerSubscriptionCreateWithoutPricesInputSchema), z.lazy(() => CustomerSubscriptionUncheckedCreateWithoutPricesInputSchema) ]).optional(),
+  connectOrCreate: z.lazy(() => CustomerSubscriptionCreateOrConnectWithoutPricesInputSchema).optional(),
+  connect: z.lazy(() => CustomerSubscriptionWhereUniqueInputSchema).optional(),
+});
+
+export const CustomerSubscriptionUpdateOneRequiredWithoutPricesNestedInputSchema: z.ZodType<Prisma.CustomerSubscriptionUpdateOneRequiredWithoutPricesNestedInput> = z.strictObject({
+  create: z.union([ z.lazy(() => CustomerSubscriptionCreateWithoutPricesInputSchema), z.lazy(() => CustomerSubscriptionUncheckedCreateWithoutPricesInputSchema) ]).optional(),
+  connectOrCreate: z.lazy(() => CustomerSubscriptionCreateOrConnectWithoutPricesInputSchema).optional(),
+  upsert: z.lazy(() => CustomerSubscriptionUpsertWithoutPricesInputSchema).optional(),
+  connect: z.lazy(() => CustomerSubscriptionWhereUniqueInputSchema).optional(),
+  update: z.union([ z.lazy(() => CustomerSubscriptionUpdateToOneWithWhereWithoutPricesInputSchema), z.lazy(() => CustomerSubscriptionUpdateWithoutPricesInputSchema), z.lazy(() => CustomerSubscriptionUncheckedUpdateWithoutPricesInputSchema) ]).optional(),
 });
 
 export const CustomerSubscriptionCreateNestedOneWithoutSubscriptionHistoryInputSchema: z.ZodType<Prisma.CustomerSubscriptionCreateNestedOneWithoutSubscriptionHistoryInput> = z.strictObject({
@@ -3878,6 +4182,7 @@ export const CustomerSubscriptionCreateWithoutProductInputSchema: z.ZodType<Pris
   vendorCustomers: z.lazy(() => VendorCustomersCreateNestedOneWithoutSubscriptionInputSchema),
   requests: z.lazy(() => RequestsCreateNestedManyWithoutSubscriptionInputSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryCreateNestedManyWithoutSubscriptionInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceCreateNestedManyWithoutSubscriptionInputSchema).optional(),
 });
 
 export const CustomerSubscriptionUncheckedCreateWithoutProductInputSchema: z.ZodType<Prisma.CustomerSubscriptionUncheckedCreateWithoutProductInput> = z.strictObject({
@@ -3892,6 +4197,7 @@ export const CustomerSubscriptionUncheckedCreateWithoutProductInputSchema: z.Zod
   updatedAt: z.coerce.date().optional(),
   requests: z.lazy(() => RequestsUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
 });
 
 export const CustomerSubscriptionCreateOrConnectWithoutProductInputSchema: z.ZodType<Prisma.CustomerSubscriptionCreateOrConnectWithoutProductInput> = z.strictObject({
@@ -4108,6 +4414,7 @@ export const CustomerSubscriptionCreateWithoutVendorCustomersInputSchema: z.ZodT
   product: z.lazy(() => ProductCreateNestedOneWithoutSubscriptionInputSchema),
   requests: z.lazy(() => RequestsCreateNestedManyWithoutSubscriptionInputSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryCreateNestedManyWithoutSubscriptionInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceCreateNestedManyWithoutSubscriptionInputSchema).optional(),
 });
 
 export const CustomerSubscriptionUncheckedCreateWithoutVendorCustomersInputSchema: z.ZodType<Prisma.CustomerSubscriptionUncheckedCreateWithoutVendorCustomersInput> = z.strictObject({
@@ -4122,6 +4429,7 @@ export const CustomerSubscriptionUncheckedCreateWithoutVendorCustomersInputSchem
   updatedAt: z.coerce.date().optional(),
   requests: z.lazy(() => RequestsUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
 });
 
 export const CustomerSubscriptionCreateOrConnectWithoutVendorCustomersInputSchema: z.ZodType<Prisma.CustomerSubscriptionCreateOrConnectWithoutVendorCustomersInput> = z.strictObject({
@@ -4406,6 +4714,32 @@ export const SubscriptionHistoryCreateManySubscriptionInputEnvelopeSchema: z.Zod
   skipDuplicates: z.boolean().optional(),
 });
 
+export const SubscriptionPriceCreateWithoutSubscriptionInputSchema: z.ZodType<Prisma.SubscriptionPriceCreateWithoutSubscriptionInput> = z.strictObject({
+  id: z.uuid().optional(),
+  price: z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),
+  effectiveFrom: z.coerce.date(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+});
+
+export const SubscriptionPriceUncheckedCreateWithoutSubscriptionInputSchema: z.ZodType<Prisma.SubscriptionPriceUncheckedCreateWithoutSubscriptionInput> = z.strictObject({
+  id: z.uuid().optional(),
+  price: z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),
+  effectiveFrom: z.coerce.date(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+});
+
+export const SubscriptionPriceCreateOrConnectWithoutSubscriptionInputSchema: z.ZodType<Prisma.SubscriptionPriceCreateOrConnectWithoutSubscriptionInput> = z.strictObject({
+  where: z.lazy(() => SubscriptionPriceWhereUniqueInputSchema),
+  create: z.union([ z.lazy(() => SubscriptionPriceCreateWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceUncheckedCreateWithoutSubscriptionInputSchema) ]),
+});
+
+export const SubscriptionPriceCreateManySubscriptionInputEnvelopeSchema: z.ZodType<Prisma.SubscriptionPriceCreateManySubscriptionInputEnvelope> = z.strictObject({
+  data: z.union([ z.lazy(() => SubscriptionPriceCreateManySubscriptionInputSchema), z.lazy(() => SubscriptionPriceCreateManySubscriptionInputSchema).array() ]),
+  skipDuplicates: z.boolean().optional(),
+});
+
 export const VendorCustomersUpsertWithoutSubscriptionInputSchema: z.ZodType<Prisma.VendorCustomersUpsertWithoutSubscriptionInput> = z.strictObject({
   update: z.union([ z.lazy(() => VendorCustomersUpdateWithoutSubscriptionInputSchema), z.lazy(() => VendorCustomersUncheckedUpdateWithoutSubscriptionInputSchema) ]),
   create: z.union([ z.lazy(() => VendorCustomersCreateWithoutSubscriptionInputSchema), z.lazy(() => VendorCustomersUncheckedCreateWithoutSubscriptionInputSchema) ]),
@@ -4522,6 +4856,110 @@ export const SubscriptionHistoryScalarWhereInputSchema: z.ZodType<Prisma.Subscri
   updatedAt: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
 });
 
+export const SubscriptionPriceUpsertWithWhereUniqueWithoutSubscriptionInputSchema: z.ZodType<Prisma.SubscriptionPriceUpsertWithWhereUniqueWithoutSubscriptionInput> = z.strictObject({
+  where: z.lazy(() => SubscriptionPriceWhereUniqueInputSchema),
+  update: z.union([ z.lazy(() => SubscriptionPriceUpdateWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceUncheckedUpdateWithoutSubscriptionInputSchema) ]),
+  create: z.union([ z.lazy(() => SubscriptionPriceCreateWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceUncheckedCreateWithoutSubscriptionInputSchema) ]),
+});
+
+export const SubscriptionPriceUpdateWithWhereUniqueWithoutSubscriptionInputSchema: z.ZodType<Prisma.SubscriptionPriceUpdateWithWhereUniqueWithoutSubscriptionInput> = z.strictObject({
+  where: z.lazy(() => SubscriptionPriceWhereUniqueInputSchema),
+  data: z.union([ z.lazy(() => SubscriptionPriceUpdateWithoutSubscriptionInputSchema), z.lazy(() => SubscriptionPriceUncheckedUpdateWithoutSubscriptionInputSchema) ]),
+});
+
+export const SubscriptionPriceUpdateManyWithWhereWithoutSubscriptionInputSchema: z.ZodType<Prisma.SubscriptionPriceUpdateManyWithWhereWithoutSubscriptionInput> = z.strictObject({
+  where: z.lazy(() => SubscriptionPriceScalarWhereInputSchema),
+  data: z.union([ z.lazy(() => SubscriptionPriceUpdateManyMutationInputSchema), z.lazy(() => SubscriptionPriceUncheckedUpdateManyWithoutSubscriptionInputSchema) ]),
+});
+
+export const SubscriptionPriceScalarWhereInputSchema: z.ZodType<Prisma.SubscriptionPriceScalarWhereInput> = z.strictObject({
+  AND: z.union([ z.lazy(() => SubscriptionPriceScalarWhereInputSchema), z.lazy(() => SubscriptionPriceScalarWhereInputSchema).array() ]).optional(),
+  OR: z.lazy(() => SubscriptionPriceScalarWhereInputSchema).array().optional(),
+  NOT: z.union([ z.lazy(() => SubscriptionPriceScalarWhereInputSchema), z.lazy(() => SubscriptionPriceScalarWhereInputSchema).array() ]).optional(),
+  id: z.union([ z.lazy(() => StringFilterSchema), z.string() ]).optional(),
+  subscriptionId: z.union([ z.lazy(() => StringFilterSchema), z.string() ]).optional(),
+  price: z.union([ z.lazy(() => DecimalFilterSchema), z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }) ]).optional(),
+  effectiveFrom: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+  createdAt: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+  updatedAt: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+});
+
+export const CustomerSubscriptionCreateWithoutPricesInputSchema: z.ZodType<Prisma.CustomerSubscriptionCreateWithoutPricesInput> = z.strictObject({
+  id: z.uuid().optional(),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date().optional().nullable(),
+  dailyQuantity: z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),
+  price: z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }).optional(),
+  status: z.lazy(() => SubscriptionStatusSchema).optional(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+  vendorCustomers: z.lazy(() => VendorCustomersCreateNestedOneWithoutSubscriptionInputSchema),
+  product: z.lazy(() => ProductCreateNestedOneWithoutSubscriptionInputSchema),
+  requests: z.lazy(() => RequestsCreateNestedManyWithoutSubscriptionInputSchema).optional(),
+  subscriptionHistory: z.lazy(() => SubscriptionHistoryCreateNestedManyWithoutSubscriptionInputSchema).optional(),
+});
+
+export const CustomerSubscriptionUncheckedCreateWithoutPricesInputSchema: z.ZodType<Prisma.CustomerSubscriptionUncheckedCreateWithoutPricesInput> = z.strictObject({
+  id: z.uuid().optional(),
+  vendorCustomerId: z.string(),
+  productId: z.string(),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date().optional().nullable(),
+  dailyQuantity: z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),
+  price: z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }).optional(),
+  status: z.lazy(() => SubscriptionStatusSchema).optional(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+  requests: z.lazy(() => RequestsUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
+  subscriptionHistory: z.lazy(() => SubscriptionHistoryUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
+});
+
+export const CustomerSubscriptionCreateOrConnectWithoutPricesInputSchema: z.ZodType<Prisma.CustomerSubscriptionCreateOrConnectWithoutPricesInput> = z.strictObject({
+  where: z.lazy(() => CustomerSubscriptionWhereUniqueInputSchema),
+  create: z.union([ z.lazy(() => CustomerSubscriptionCreateWithoutPricesInputSchema), z.lazy(() => CustomerSubscriptionUncheckedCreateWithoutPricesInputSchema) ]),
+});
+
+export const CustomerSubscriptionUpsertWithoutPricesInputSchema: z.ZodType<Prisma.CustomerSubscriptionUpsertWithoutPricesInput> = z.strictObject({
+  update: z.union([ z.lazy(() => CustomerSubscriptionUpdateWithoutPricesInputSchema), z.lazy(() => CustomerSubscriptionUncheckedUpdateWithoutPricesInputSchema) ]),
+  create: z.union([ z.lazy(() => CustomerSubscriptionCreateWithoutPricesInputSchema), z.lazy(() => CustomerSubscriptionUncheckedCreateWithoutPricesInputSchema) ]),
+  where: z.lazy(() => CustomerSubscriptionWhereInputSchema).optional(),
+});
+
+export const CustomerSubscriptionUpdateToOneWithWhereWithoutPricesInputSchema: z.ZodType<Prisma.CustomerSubscriptionUpdateToOneWithWhereWithoutPricesInput> = z.strictObject({
+  where: z.lazy(() => CustomerSubscriptionWhereInputSchema).optional(),
+  data: z.union([ z.lazy(() => CustomerSubscriptionUpdateWithoutPricesInputSchema), z.lazy(() => CustomerSubscriptionUncheckedUpdateWithoutPricesInputSchema) ]),
+});
+
+export const CustomerSubscriptionUpdateWithoutPricesInputSchema: z.ZodType<Prisma.CustomerSubscriptionUpdateWithoutPricesInput> = z.strictObject({
+  id: z.union([ z.uuid(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  startDate: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  endDate: z.union([ z.coerce.date(),z.lazy(() => NullableDateTimeFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  dailyQuantity: z.union([ z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),z.lazy(() => DecimalFieldUpdateOperationsInputSchema) ]).optional(),
+  price: z.union([ z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),z.lazy(() => DecimalFieldUpdateOperationsInputSchema) ]).optional(),
+  status: z.union([ z.lazy(() => SubscriptionStatusSchema), z.lazy(() => EnumSubscriptionStatusFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  vendorCustomers: z.lazy(() => VendorCustomersUpdateOneRequiredWithoutSubscriptionNestedInputSchema).optional(),
+  product: z.lazy(() => ProductUpdateOneRequiredWithoutSubscriptionNestedInputSchema).optional(),
+  requests: z.lazy(() => RequestsUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
+  subscriptionHistory: z.lazy(() => SubscriptionHistoryUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
+});
+
+export const CustomerSubscriptionUncheckedUpdateWithoutPricesInputSchema: z.ZodType<Prisma.CustomerSubscriptionUncheckedUpdateWithoutPricesInput> = z.strictObject({
+  id: z.union([ z.uuid(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  vendorCustomerId: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  productId: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  startDate: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  endDate: z.union([ z.coerce.date(),z.lazy(() => NullableDateTimeFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  dailyQuantity: z.union([ z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),z.lazy(() => DecimalFieldUpdateOperationsInputSchema) ]).optional(),
+  price: z.union([ z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),z.lazy(() => DecimalFieldUpdateOperationsInputSchema) ]).optional(),
+  status: z.union([ z.lazy(() => SubscriptionStatusSchema), z.lazy(() => EnumSubscriptionStatusFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  requests: z.lazy(() => RequestsUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
+  subscriptionHistory: z.lazy(() => SubscriptionHistoryUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
+});
+
 export const CustomerSubscriptionCreateWithoutSubscriptionHistoryInputSchema: z.ZodType<Prisma.CustomerSubscriptionCreateWithoutSubscriptionHistoryInput> = z.strictObject({
   id: z.uuid().optional(),
   startDate: z.coerce.date(),
@@ -4534,6 +4972,7 @@ export const CustomerSubscriptionCreateWithoutSubscriptionHistoryInputSchema: z.
   vendorCustomers: z.lazy(() => VendorCustomersCreateNestedOneWithoutSubscriptionInputSchema),
   product: z.lazy(() => ProductCreateNestedOneWithoutSubscriptionInputSchema),
   requests: z.lazy(() => RequestsCreateNestedManyWithoutSubscriptionInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceCreateNestedManyWithoutSubscriptionInputSchema).optional(),
 });
 
 export const CustomerSubscriptionUncheckedCreateWithoutSubscriptionHistoryInputSchema: z.ZodType<Prisma.CustomerSubscriptionUncheckedCreateWithoutSubscriptionHistoryInput> = z.strictObject({
@@ -4548,6 +4987,7 @@ export const CustomerSubscriptionUncheckedCreateWithoutSubscriptionHistoryInputS
   createdAt: z.coerce.date().optional(),
   updatedAt: z.coerce.date().optional(),
   requests: z.lazy(() => RequestsUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
 });
 
 export const CustomerSubscriptionCreateOrConnectWithoutSubscriptionHistoryInputSchema: z.ZodType<Prisma.CustomerSubscriptionCreateOrConnectWithoutSubscriptionHistoryInput> = z.strictObject({
@@ -4578,6 +5018,7 @@ export const CustomerSubscriptionUpdateWithoutSubscriptionHistoryInputSchema: z.
   vendorCustomers: z.lazy(() => VendorCustomersUpdateOneRequiredWithoutSubscriptionNestedInputSchema).optional(),
   product: z.lazy(() => ProductUpdateOneRequiredWithoutSubscriptionNestedInputSchema).optional(),
   requests: z.lazy(() => RequestsUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
 });
 
 export const CustomerSubscriptionUncheckedUpdateWithoutSubscriptionHistoryInputSchema: z.ZodType<Prisma.CustomerSubscriptionUncheckedUpdateWithoutSubscriptionHistoryInput> = z.strictObject({
@@ -4592,6 +5033,7 @@ export const CustomerSubscriptionUncheckedUpdateWithoutSubscriptionHistoryInputS
   createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
   updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
   requests: z.lazy(() => RequestsUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
 });
 
 export const VendorCustomersCreateWithoutRequestInputSchema: z.ZodType<Prisma.VendorCustomersCreateWithoutRequestInput> = z.strictObject({
@@ -4658,6 +5100,7 @@ export const CustomerSubscriptionCreateWithoutRequestsInputSchema: z.ZodType<Pri
   vendorCustomers: z.lazy(() => VendorCustomersCreateNestedOneWithoutSubscriptionInputSchema),
   product: z.lazy(() => ProductCreateNestedOneWithoutSubscriptionInputSchema),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryCreateNestedManyWithoutSubscriptionInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceCreateNestedManyWithoutSubscriptionInputSchema).optional(),
 });
 
 export const CustomerSubscriptionUncheckedCreateWithoutRequestsInputSchema: z.ZodType<Prisma.CustomerSubscriptionUncheckedCreateWithoutRequestsInput> = z.strictObject({
@@ -4672,6 +5115,7 @@ export const CustomerSubscriptionUncheckedCreateWithoutRequestsInputSchema: z.Zo
   createdAt: z.coerce.date().optional(),
   updatedAt: z.coerce.date().optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUncheckedCreateNestedManyWithoutSubscriptionInputSchema).optional(),
 });
 
 export const CustomerSubscriptionCreateOrConnectWithoutRequestsInputSchema: z.ZodType<Prisma.CustomerSubscriptionCreateOrConnectWithoutRequestsInput> = z.strictObject({
@@ -4766,6 +5210,7 @@ export const CustomerSubscriptionUpdateWithoutRequestsInputSchema: z.ZodType<Pri
   vendorCustomers: z.lazy(() => VendorCustomersUpdateOneRequiredWithoutSubscriptionNestedInputSchema).optional(),
   product: z.lazy(() => ProductUpdateOneRequiredWithoutSubscriptionNestedInputSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
 });
 
 export const CustomerSubscriptionUncheckedUpdateWithoutRequestsInputSchema: z.ZodType<Prisma.CustomerSubscriptionUncheckedUpdateWithoutRequestsInput> = z.strictObject({
@@ -4780,6 +5225,7 @@ export const CustomerSubscriptionUncheckedUpdateWithoutRequestsInputSchema: z.Zo
   createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
   updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
 });
 
 export const UserCreateWithoutPushTokenInputSchema: z.ZodType<Prisma.UserCreateWithoutPushTokenInput> = z.strictObject({
@@ -5025,6 +5471,7 @@ export const CustomerSubscriptionUpdateWithoutProductInputSchema: z.ZodType<Pris
   vendorCustomers: z.lazy(() => VendorCustomersUpdateOneRequiredWithoutSubscriptionNestedInputSchema).optional(),
   requests: z.lazy(() => RequestsUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
 });
 
 export const CustomerSubscriptionUncheckedUpdateWithoutProductInputSchema: z.ZodType<Prisma.CustomerSubscriptionUncheckedUpdateWithoutProductInput> = z.strictObject({
@@ -5039,6 +5486,7 @@ export const CustomerSubscriptionUncheckedUpdateWithoutProductInputSchema: z.Zod
   updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
   requests: z.lazy(() => RequestsUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
 });
 
 export const CustomerSubscriptionUncheckedUpdateManyWithoutProductInputSchema: z.ZodType<Prisma.CustomerSubscriptionUncheckedUpdateManyWithoutProductInput> = z.strictObject({
@@ -5137,6 +5585,7 @@ export const CustomerSubscriptionUpdateWithoutVendorCustomersInputSchema: z.ZodT
   product: z.lazy(() => ProductUpdateOneRequiredWithoutSubscriptionNestedInputSchema).optional(),
   requests: z.lazy(() => RequestsUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
 });
 
 export const CustomerSubscriptionUncheckedUpdateWithoutVendorCustomersInputSchema: z.ZodType<Prisma.CustomerSubscriptionUncheckedUpdateWithoutVendorCustomersInput> = z.strictObject({
@@ -5151,6 +5600,7 @@ export const CustomerSubscriptionUncheckedUpdateWithoutVendorCustomersInputSchem
   updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
   requests: z.lazy(() => RequestsUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
   subscriptionHistory: z.lazy(() => SubscriptionHistoryUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
+  prices: z.lazy(() => SubscriptionPriceUncheckedUpdateManyWithoutSubscriptionNestedInputSchema).optional(),
 });
 
 export const CustomerSubscriptionUncheckedUpdateManyWithoutVendorCustomersInputSchema: z.ZodType<Prisma.CustomerSubscriptionUncheckedUpdateManyWithoutVendorCustomersInput> = z.strictObject({
@@ -5237,6 +5687,14 @@ export const SubscriptionHistoryCreateManySubscriptionInputSchema: z.ZodType<Pri
   endDate: z.coerce.date(),
   durationDays: z.number().int(),
   status: z.lazy(() => SubscriptionStatusSchema).optional(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+});
+
+export const SubscriptionPriceCreateManySubscriptionInputSchema: z.ZodType<Prisma.SubscriptionPriceCreateManySubscriptionInput> = z.strictObject({
+  id: z.uuid().optional(),
+  price: z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),
+  effectiveFrom: z.coerce.date(),
   createdAt: z.coerce.date().optional(),
   updatedAt: z.coerce.date().optional(),
 });
@@ -5330,6 +5788,30 @@ export const SubscriptionHistoryUncheckedUpdateManyWithoutSubscriptionInputSchem
   endDate: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
   durationDays: z.union([ z.number().int(),z.lazy(() => IntFieldUpdateOperationsInputSchema) ]).optional(),
   status: z.union([ z.lazy(() => SubscriptionStatusSchema), z.lazy(() => EnumSubscriptionStatusFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+});
+
+export const SubscriptionPriceUpdateWithoutSubscriptionInputSchema: z.ZodType<Prisma.SubscriptionPriceUpdateWithoutSubscriptionInput> = z.strictObject({
+  id: z.union([ z.uuid(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  price: z.union([ z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),z.lazy(() => DecimalFieldUpdateOperationsInputSchema) ]).optional(),
+  effectiveFrom: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+});
+
+export const SubscriptionPriceUncheckedUpdateWithoutSubscriptionInputSchema: z.ZodType<Prisma.SubscriptionPriceUncheckedUpdateWithoutSubscriptionInput> = z.strictObject({
+  id: z.union([ z.uuid(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  price: z.union([ z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),z.lazy(() => DecimalFieldUpdateOperationsInputSchema) ]).optional(),
+  effectiveFrom: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+});
+
+export const SubscriptionPriceUncheckedUpdateManyWithoutSubscriptionInputSchema: z.ZodType<Prisma.SubscriptionPriceUncheckedUpdateManyWithoutSubscriptionInput> = z.strictObject({
+  id: z.union([ z.uuid(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  price: z.union([ z.union([z.number(),z.string(),z.instanceof(Prisma.Decimal),DecimalJsLikeSchema,]).refine((v) => isValidDecimalInput(v), { message: 'Must be a Decimal' }),z.lazy(() => DecimalFieldUpdateOperationsInputSchema) ]).optional(),
+  effectiveFrom: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
   createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
   updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
 });
@@ -5646,6 +6128,68 @@ export const CustomerSubscriptionFindUniqueOrThrowArgsSchema: z.ZodType<Prisma.C
   select: CustomerSubscriptionSelectSchema.optional(),
   include: CustomerSubscriptionIncludeSchema.optional(),
   where: CustomerSubscriptionWhereUniqueInputSchema, 
+}).strict();
+
+export const SubscriptionPriceFindFirstArgsSchema: z.ZodType<Prisma.SubscriptionPriceFindFirstArgs> = z.object({
+  select: SubscriptionPriceSelectSchema.optional(),
+  include: SubscriptionPriceIncludeSchema.optional(),
+  where: SubscriptionPriceWhereInputSchema.optional(), 
+  orderBy: z.union([ SubscriptionPriceOrderByWithRelationInputSchema.array(), SubscriptionPriceOrderByWithRelationInputSchema ]).optional(),
+  cursor: SubscriptionPriceWhereUniqueInputSchema.optional(), 
+  take: z.number().optional(),
+  skip: z.number().optional(),
+  distinct: z.union([ SubscriptionPriceScalarFieldEnumSchema, SubscriptionPriceScalarFieldEnumSchema.array() ]).optional(),
+}).strict();
+
+export const SubscriptionPriceFindFirstOrThrowArgsSchema: z.ZodType<Prisma.SubscriptionPriceFindFirstOrThrowArgs> = z.object({
+  select: SubscriptionPriceSelectSchema.optional(),
+  include: SubscriptionPriceIncludeSchema.optional(),
+  where: SubscriptionPriceWhereInputSchema.optional(), 
+  orderBy: z.union([ SubscriptionPriceOrderByWithRelationInputSchema.array(), SubscriptionPriceOrderByWithRelationInputSchema ]).optional(),
+  cursor: SubscriptionPriceWhereUniqueInputSchema.optional(), 
+  take: z.number().optional(),
+  skip: z.number().optional(),
+  distinct: z.union([ SubscriptionPriceScalarFieldEnumSchema, SubscriptionPriceScalarFieldEnumSchema.array() ]).optional(),
+}).strict();
+
+export const SubscriptionPriceFindManyArgsSchema: z.ZodType<Prisma.SubscriptionPriceFindManyArgs> = z.object({
+  select: SubscriptionPriceSelectSchema.optional(),
+  include: SubscriptionPriceIncludeSchema.optional(),
+  where: SubscriptionPriceWhereInputSchema.optional(), 
+  orderBy: z.union([ SubscriptionPriceOrderByWithRelationInputSchema.array(), SubscriptionPriceOrderByWithRelationInputSchema ]).optional(),
+  cursor: SubscriptionPriceWhereUniqueInputSchema.optional(), 
+  take: z.number().optional(),
+  skip: z.number().optional(),
+  distinct: z.union([ SubscriptionPriceScalarFieldEnumSchema, SubscriptionPriceScalarFieldEnumSchema.array() ]).optional(),
+}).strict();
+
+export const SubscriptionPriceAggregateArgsSchema: z.ZodType<Prisma.SubscriptionPriceAggregateArgs> = z.object({
+  where: SubscriptionPriceWhereInputSchema.optional(), 
+  orderBy: z.union([ SubscriptionPriceOrderByWithRelationInputSchema.array(), SubscriptionPriceOrderByWithRelationInputSchema ]).optional(),
+  cursor: SubscriptionPriceWhereUniqueInputSchema.optional(), 
+  take: z.number().optional(),
+  skip: z.number().optional(),
+}).strict();
+
+export const SubscriptionPriceGroupByArgsSchema: z.ZodType<Prisma.SubscriptionPriceGroupByArgs> = z.object({
+  where: SubscriptionPriceWhereInputSchema.optional(), 
+  orderBy: z.union([ SubscriptionPriceOrderByWithAggregationInputSchema.array(), SubscriptionPriceOrderByWithAggregationInputSchema ]).optional(),
+  by: SubscriptionPriceScalarFieldEnumSchema.array(), 
+  having: SubscriptionPriceScalarWhereWithAggregatesInputSchema.optional(), 
+  take: z.number().optional(),
+  skip: z.number().optional(),
+}).strict();
+
+export const SubscriptionPriceFindUniqueArgsSchema: z.ZodType<Prisma.SubscriptionPriceFindUniqueArgs> = z.object({
+  select: SubscriptionPriceSelectSchema.optional(),
+  include: SubscriptionPriceIncludeSchema.optional(),
+  where: SubscriptionPriceWhereUniqueInputSchema, 
+}).strict();
+
+export const SubscriptionPriceFindUniqueOrThrowArgsSchema: z.ZodType<Prisma.SubscriptionPriceFindUniqueOrThrowArgs> = z.object({
+  select: SubscriptionPriceSelectSchema.optional(),
+  include: SubscriptionPriceIncludeSchema.optional(),
+  where: SubscriptionPriceWhereUniqueInputSchema, 
 }).strict();
 
 export const SubscriptionHistoryFindFirstArgsSchema: z.ZodType<Prisma.SubscriptionHistoryFindFirstArgs> = z.object({
@@ -6101,6 +6645,60 @@ export const CustomerSubscriptionUpdateManyAndReturnArgsSchema: z.ZodType<Prisma
 
 export const CustomerSubscriptionDeleteManyArgsSchema: z.ZodType<Prisma.CustomerSubscriptionDeleteManyArgs> = z.object({
   where: CustomerSubscriptionWhereInputSchema.optional(), 
+  limit: z.number().optional(),
+}).strict();
+
+export const SubscriptionPriceCreateArgsSchema: z.ZodType<Prisma.SubscriptionPriceCreateArgs> = z.object({
+  select: SubscriptionPriceSelectSchema.optional(),
+  include: SubscriptionPriceIncludeSchema.optional(),
+  data: z.union([ SubscriptionPriceCreateInputSchema, SubscriptionPriceUncheckedCreateInputSchema ]),
+}).strict();
+
+export const SubscriptionPriceUpsertArgsSchema: z.ZodType<Prisma.SubscriptionPriceUpsertArgs> = z.object({
+  select: SubscriptionPriceSelectSchema.optional(),
+  include: SubscriptionPriceIncludeSchema.optional(),
+  where: SubscriptionPriceWhereUniqueInputSchema, 
+  create: z.union([ SubscriptionPriceCreateInputSchema, SubscriptionPriceUncheckedCreateInputSchema ]),
+  update: z.union([ SubscriptionPriceUpdateInputSchema, SubscriptionPriceUncheckedUpdateInputSchema ]),
+}).strict();
+
+export const SubscriptionPriceCreateManyArgsSchema: z.ZodType<Prisma.SubscriptionPriceCreateManyArgs> = z.object({
+  data: z.union([ SubscriptionPriceCreateManyInputSchema, SubscriptionPriceCreateManyInputSchema.array() ]),
+  skipDuplicates: z.boolean().optional(),
+}).strict();
+
+export const SubscriptionPriceCreateManyAndReturnArgsSchema: z.ZodType<Prisma.SubscriptionPriceCreateManyAndReturnArgs> = z.object({
+  data: z.union([ SubscriptionPriceCreateManyInputSchema, SubscriptionPriceCreateManyInputSchema.array() ]),
+  skipDuplicates: z.boolean().optional(),
+}).strict();
+
+export const SubscriptionPriceDeleteArgsSchema: z.ZodType<Prisma.SubscriptionPriceDeleteArgs> = z.object({
+  select: SubscriptionPriceSelectSchema.optional(),
+  include: SubscriptionPriceIncludeSchema.optional(),
+  where: SubscriptionPriceWhereUniqueInputSchema, 
+}).strict();
+
+export const SubscriptionPriceUpdateArgsSchema: z.ZodType<Prisma.SubscriptionPriceUpdateArgs> = z.object({
+  select: SubscriptionPriceSelectSchema.optional(),
+  include: SubscriptionPriceIncludeSchema.optional(),
+  data: z.union([ SubscriptionPriceUpdateInputSchema, SubscriptionPriceUncheckedUpdateInputSchema ]),
+  where: SubscriptionPriceWhereUniqueInputSchema, 
+}).strict();
+
+export const SubscriptionPriceUpdateManyArgsSchema: z.ZodType<Prisma.SubscriptionPriceUpdateManyArgs> = z.object({
+  data: z.union([ SubscriptionPriceUpdateManyMutationInputSchema, SubscriptionPriceUncheckedUpdateManyInputSchema ]),
+  where: SubscriptionPriceWhereInputSchema.optional(), 
+  limit: z.number().optional(),
+}).strict();
+
+export const SubscriptionPriceUpdateManyAndReturnArgsSchema: z.ZodType<Prisma.SubscriptionPriceUpdateManyAndReturnArgs> = z.object({
+  data: z.union([ SubscriptionPriceUpdateManyMutationInputSchema, SubscriptionPriceUncheckedUpdateManyInputSchema ]),
+  where: SubscriptionPriceWhereInputSchema.optional(), 
+  limit: z.number().optional(),
+}).strict();
+
+export const SubscriptionPriceDeleteManyArgsSchema: z.ZodType<Prisma.SubscriptionPriceDeleteManyArgs> = z.object({
+  where: SubscriptionPriceWhereInputSchema.optional(), 
   limit: z.number().optional(),
 }).strict();
 

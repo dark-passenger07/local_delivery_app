@@ -61,6 +61,14 @@ export const subscribeProduct = async (req: Request, res: Response) => {
 
     const { dailyQuantity, startDate, price } = validateBody.data
 
+    // Normalize to local midnight so the seeded price row lines up with the
+    // midday-anchored comparisons used when pricing revenue. `startDate` arrives
+    // as a date-only string, which parses to UTC midnight — in any timezone east
+    // of UTC that lands mid-morning of the same local day, and west of UTC it
+    // lands on the previous local day.
+    const priceEffectiveFrom = new Date(startDate)
+    priceEffectiveFrom.setHours(0, 0, 0, 0)
+
     const activeSubscription = await db.customerSubscription.findFirst({
       where: {
         vendorCustomerId: vendorCustomer.id,
@@ -89,6 +97,14 @@ export const subscribeProduct = async (req: Request, res: Response) => {
         dailyQuantity: dailyQuantity.toString(),
         price: price.toString(),
         startDate,
+        // Seed price history with the subscribe-time price so later vendor
+        // price changes are layered on top of a known starting point.
+        prices: {
+          create: {
+            price: price.toString(),
+            effectiveFrom: priceEffectiveFrom,
+          },
+        },
       },
       include: {
         product: {
@@ -520,6 +536,183 @@ export const getVendorCustomerSubscriptions = async (req: Request, res: Response
       message: "Internal Server Error",
       success: false,
     })
+  }
+}
+
+const UpdatePriceSchema = z.object({
+  price: z.coerce.number().positive("Price must be a positive number"),
+  effectiveFrom: z.enum(["NEXT_DAY", "NEXT_MONTH"]),
+})
+
+// Vendor changes a single customer's per-unit price for one product. The change
+// is never retroactive: it takes effect either from tomorrow or from the 1st of
+// next month, and is stored as a dated row in the subscription's price history
+// so revenue already earned at the old price is left untouched.
+export const updateSubscriptionPrice = async (req: Request, res: Response) => {
+  try {
+    const vendor = req.vendor
+    if (!vendor) {
+      return res.status(401).json({ message: "Vendor doesn't exist!", success: false })
+    }
+
+    const subscriptionId = req.params.id as string
+    if (!subscriptionId) {
+      return res.status(400).json({ message: "Subscription ID is required", success: false })
+    }
+
+    const validateBody = UpdatePriceSchema.safeParse({
+      price: req.body.price,
+      effectiveFrom: req.body.effectiveFrom,
+    })
+
+    if (!validateBody.success) {
+      return res.status(400).json({
+        message: "Validation failed",
+        success: false,
+        fieldErrors: validateBody.error.flatten().fieldErrors,
+      })
+    }
+
+    const { price, effectiveFrom } = validateBody.data
+
+    const subscription = await db.customerSubscription.findUnique({
+      where: { id: subscriptionId },
+      include: {
+        product: { select: { productName: true } },
+        vendorCustomers: { select: { vendorId: true, customerId: true } },
+      },
+    })
+
+    if (!subscription) {
+      return res.status(404).json({ message: "Subscription not found", success: false })
+    }
+
+    if (subscription.vendorCustomers.vendorId !== vendor.id) {
+      return res.status(403).json({
+        message: "You are not authorized to update this subscription",
+        success: false,
+      })
+    }
+
+    if (subscription.status !== "ACTIVE") {
+      return res.status(400).json({
+        message: "Only active subscriptions can have their price updated.",
+        success: false,
+      })
+    }
+
+    // Resolve the effective date at local midnight.
+    const effectiveDate = new Date()
+    effectiveDate.setHours(0, 0, 0, 0)
+    if (effectiveFrom === "NEXT_DAY") {
+      effectiveDate.setDate(effectiveDate.getDate() + 1)
+    } else {
+      // First day of next month.
+      effectiveDate.setMonth(effectiveDate.getMonth() + 1, 1)
+    }
+
+    // Upsert so re-scheduling a change for the same date replaces it rather
+    // than stacking duplicate rows (guarded by @@unique on subscriptionId +
+    // effectiveFrom).
+    const priceRow = await db.subscriptionPrice.upsert({
+      where: {
+        subscriptionId_effectiveFrom: {
+          subscriptionId,
+          effectiveFrom: effectiveDate,
+        },
+      },
+      update: { price: price.toString() },
+      create: {
+        subscriptionId,
+        price: price.toString(),
+        effectiveFrom: effectiveDate,
+      },
+    })
+
+    // Notify the customer so a price change is never a surprise on their bill.
+    const formattedDate = effectiveDate.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    })
+
+    await sendNotification(
+      subscription.vendorCustomers.customerId,
+      `Price updated: ${subscription.product.productName}`,
+      `${vendor.businessName} set a new price of ₹${price} per unit, effective ${formattedDate}.`
+    )
+
+    return res.status(200).json({
+      message: "Price updated successfully!",
+      success: true,
+      price: priceRow.price.toString(),
+      effectiveFrom: priceRow.effectiveFrom.toISOString(),
+    })
+  } catch (error: any) {
+    console.log("Error while updating subscription price: ", error.message)
+    return res.status(500).json({ message: "Internal Server Error", success: false })
+  }
+}
+
+// Permanently remove an unsubscribed (STOPPED) subscription record. Vendors use
+// this to clean up a customer's finished subscriptions after settling payment.
+// Deleting the subscription also removes its Requests and SubscriptionHistory
+// rows via onDelete: Cascade, and drops it from the vendor's Total Revenue.
+export const deleteStoppedSubscription = async (req: Request, res: Response) => {
+  try {
+    const vendor = req.vendor
+    if (!vendor) {
+      return res.status(401).json({ message: "Vendor doesn't exist!", success: false })
+    }
+
+    const subscriptionId = req.params.id as string
+    if (!subscriptionId) {
+      return res.status(400).json({ message: "Subscription ID is required", success: false })
+    }
+
+    const subscription = await db.customerSubscription.findUnique({
+      where: { id: subscriptionId },
+      include: {
+        vendorCustomers: {
+          select: { vendorId: true },
+        },
+      },
+    })
+
+    if (!subscription) {
+      return res.status(404).json({ message: "Subscription not found", success: false })
+    }
+
+    // Ownership: a vendor may only delete subscriptions that belong to them.
+    if (subscription.vendorCustomers.vendorId !== vendor.id) {
+      return res.status(403).json({
+        message: "You are not authorized to delete this subscription",
+        success: false,
+      })
+    }
+
+    // Guardrail: only unsubscribed (STOPPED) subscriptions can be removed. An
+    // active subscription must be unsubscribed by the customer first, so a
+    // vendor can never wipe a live subscription (and its accruing revenue).
+    if (subscription.status !== "STOPPED") {
+      return res.status(400).json({
+        message: "Only unsubscribed (stopped) subscriptions can be deleted.",
+        success: false,
+      })
+    }
+
+    // Hard delete. Related Requests and SubscriptionHistory rows are removed
+    // automatically via onDelete: Cascade defined in the schema.
+    await db.customerSubscription.delete({ where: { id: subscriptionId } })
+
+    return res.status(200).json({
+      message: "Subscription record deleted successfully!",
+      success: true,
+      subscriptionId,
+    })
+  } catch (error: any) {
+    console.log("Error while deleting stopped subscription: ", error.message)
+    return res.status(500).json({ message: "Internal Server Error", success: false })
   }
 }
 

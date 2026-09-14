@@ -14,6 +14,9 @@ export interface SubscriptionStatsType {
   monthlyDeliveredQuantity: string
   vendorBusinessName: string
   price: string
+  /** A new price the vendor scheduled that has not started applying yet. */
+  upcomingPrice: string | null
+  upcomingPriceEffectiveFrom: string | null
   monthlyRevenue: string
   totalRevenue: string
 }

@@ -148,6 +148,30 @@ model CustomerSubscription {
   requests Requests[]
 
   subscriptionHistory SubscriptionHistory[]
+
+  prices SubscriptionPrice[]
+}
+
+/// Price history for a subscription. The vendor can change a customer's
+/// per-unit price effective from a future date (next day, or the 1st of next
+/// month), so revenue for any given day is priced with the row whose
+/// effectiveFrom is the latest date on or before that day. This keeps revenue
+/// already earned at the old price intact instead of retroactively repricing it.
+/// Subscriptions created before this table existed have no rows and fall back
+/// to CustomerSubscription.price.
+model SubscriptionPrice {
+  id             String   @id @default(uuid())
+  subscriptionId String
+  price          Decimal  @db.Decimal(10, 2)
+  /// Midnight (00:00) of the first day this price applies to.
+  effectiveFrom  DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  subscription CustomerSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, effectiveFrom])
+  @@index([subscriptionId, effectiveFrom])
 }
 
 /// Snapshot of a completed/stopped subscription, preserved so vendors can

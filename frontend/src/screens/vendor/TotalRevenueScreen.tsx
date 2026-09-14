@@ -104,6 +104,15 @@ export default function TotalRevenueScreen() {
           </View>
         </View>
 
+        {item.upcomingPrice && item.upcomingPriceEffectiveFrom && (
+          <View style={styles.upcomingPriceNote}>
+            <Feather name="clock" size={14} color="#B45309" />
+            <Text style={styles.upcomingPriceText}>
+              New price {formatCurrency(item.upcomingPrice)} from {formatDate(item.upcomingPriceEffectiveFrom)}
+            </Text>
+          </View>
+        )}
+
         <TouchableOpacity
           style={styles.detailsButton}
           onPress={() =>
@@ -366,6 +375,24 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#0F172A",
     textAlign: "center",
+  },
+  upcomingPriceNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  upcomingPriceText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: "#92400E",
   },
   detailsButton: {
     marginTop: 14,
