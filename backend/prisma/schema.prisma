@@ -82,6 +82,9 @@ model Vendor {
   businessName  String
   /// @zod.string.regex(/^\+?[1-9]\d{1,14}$/, { message: "Invalid phone number format" })
   businessPhone String
+  /// Cloudinary secure_url of the vendor's profile / shop image. Optional so
+  /// existing vendors (and vendors who skip the upload at setup) stay valid.
+  image         String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

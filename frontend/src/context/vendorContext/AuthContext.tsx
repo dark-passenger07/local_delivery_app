@@ -19,6 +19,11 @@ export type SignupTypes = {
   role: string,
   address: string
 }
+
+export type UpdateProfileTypes = {
+  name?: string,
+  address?: string
+}
 export enum RoleTypes {
   VENDOR = "VENDOR",
   CUSTOMER = "CUSTOMER"
@@ -44,6 +49,7 @@ interface AuthState {
   authUser: () => Promise<any>
   login: (credentials: LoginTypes) => Promise<any>
   signup: (credentials: SignupTypes) => Promise<any>
+  updateProfile: (data: UpdateProfileTypes) => Promise<any>
   logout: () => Promise<any>
 }
 
@@ -107,6 +113,22 @@ export const useAuthStore = create<AuthState>()(
         } catch (error: any) {
           set({ user: null }); // Reset state on error
           const message = error?.response?.data?.message ?? error?.response?.data?.error ?? error.message ?? "Signup failed";
+          throw new Error(message);
+        }
+      },
+
+      updateProfile: async (data: UpdateProfileTypes) => {
+        try {
+          const res = await axiosInstance.patch("/auth/update-profile", data)
+          if (res.data.user) {
+            // Only the edited fields come back; replace the cached user so the
+            // profile screen reflects the change immediately. Do NOT null the
+            // user on failure — a failed edit must not look like a logout.
+            set({ user: res.data.user })
+          }
+          return res.data
+        } catch (error: any) {
+          const message = error?.response?.data?.message ?? error?.response?.data?.error ?? error.message ?? "Failed to update profile";
           throw new Error(message);
         }
       },

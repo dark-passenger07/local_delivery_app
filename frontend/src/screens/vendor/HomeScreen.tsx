@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
+  Image,
   FlatList,
   StyleSheet,
   ActivityIndicator,
@@ -346,7 +347,15 @@ export default function HomeScreen() {
         </View>
         <View style={styles.headerTitleRow}>
           <View style={[styles.headerLogo, { backgroundColor: C.primarySoft }]}>
-            <Text style={[styles.headerLogoText, { color: C.primary }]}>{getInitials()}</Text>
+            {(vendorAccount as any)?.image ? (
+              <Image
+                source={{ uri: (vendorAccount as any).image }}
+                style={styles.headerLogoImage}
+                accessibilityLabel="Vendor profile image"
+              />
+            ) : (
+              <Text style={[styles.headerLogoText, { color: C.primary }]}>{getInitials()}</Text>
+            )}
           </View>
           <Text style={styles.headerTitle}>Dashboard</Text>
         </View>
@@ -494,8 +503,9 @@ const styles = StyleSheet.create({
   headerContainer: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, gap: 8 },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   businessName: { fontSize: 15, fontWeight: "700", color: C.ink, flex: 1 },
-  headerLogo: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  headerLogo: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   headerLogoText: { fontSize: 14, fontWeight: "800", letterSpacing: 0.5 },
+  headerLogoImage: { width: 36, height: 36, borderRadius: 18 },
   headerTitleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
   hello: { fontSize: 13, color: C.inkSoft, fontWeight: "500" },
   headerTitle: { fontSize: 28, fontWeight: "800", color: C.ink, letterSpacing: -0.5 },

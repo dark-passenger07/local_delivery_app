@@ -29,7 +29,13 @@
       "expo-notifications",
       "@react-native-community/datetimepicker",
       "expo-asset",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can set a shop photo for your profile."
+        }
+      ]
     ],
     "extra": {
       "eas": {
