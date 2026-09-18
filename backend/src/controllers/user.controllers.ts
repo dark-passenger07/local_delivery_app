@@ -1,4 +1,5 @@
 import { Request, Response } from "express"
+import { z } from "zod"
 // import { UserSchema } from "../generated/zod/index.js";
 import { UserSchema } from "../generated/zod/index.js";
 import { db } from "../libs/db.js";
@@ -196,6 +197,73 @@ export const currentUserController = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     console.log("Error in curr controller: ", error.message)
+    return res.status(500).json({
+      message: "Internal server error",
+      success: false,
+    })
+  }
+}
+
+// Customer / user edits their own profile. Only name and address are editable;
+// the phone number is the unique login identity (there is no password) and role
+// is fixed, so both are intentionally left out of the update.
+const UpdateUserProfileSchema = z.object({
+  name: z.string().trim().min(2, "Name must be at least 2 characters long").optional(),
+  address: z.string().trim().min(2, "Address must be at least 2 characters long").optional(),
+})
+
+export const updateProfileController = async (req: Request, res: Response) => {
+  try {
+    const user = req.user
+    if (!user) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      })
+    }
+
+    const validateBody = UpdateUserProfileSchema.safeParse(req.body)
+    if (!validateBody.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        fieldErrors: validateBody.error.flatten().fieldErrors,
+      })
+    }
+
+    const { name, address } = validateBody.data
+    const data: { name?: string; address?: string } = {}
+    if (name !== undefined) data.name = name
+    if (address !== undefined) data.address = address
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({
+        message: "No fields to update",
+        success: false,
+      })
+    }
+
+    const updatedUser = await db.user.update({
+      where: { id: user.id },
+      data,
+      select: { id: true, name: true, phone: true, role: true, address: true },
+    })
+
+    // if update profile fails
+    if(!updatedUser){
+      return res.status(500).json({
+        message:"Something went wrong while updating the profile",
+        success: false
+      })
+    }
+
+    return res.status(200).json({
+      message: "Profile updated successfully!",
+      success: true,
+      user: updatedUser,
+    })
+  } catch (error: any) {
+    console.log("Error updating user profile: ", error.message)
     return res.status(500).json({
       message: "Internal server error",
       success: false,

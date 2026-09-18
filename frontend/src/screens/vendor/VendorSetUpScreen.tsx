@@ -9,24 +9,42 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
   Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { useAuthStore } from '../../context/vendorContext/AuthContext';
 import { useVendorContextStore } from '../../context/vendorContext/VendorContext';
+import { pickImage, type PickedImage } from '../../utils/pickImage';
 
 const VendorSetUpScreen = () => {
   const { logout } = useAuthStore();
-  const { vendorProfile } = useVendorContextStore();
+  const { vendorProfile, uploadVendorImage } = useVendorContextStore();
 
 
   // Form State
   const [businessName, setBusinessName] = useState('');
   const [businessPhone, setBusinessPhone] = useState('');
+  const [pickedImage, setPickedImage] = useState<PickedImage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const imageUri = pickedImage?.uri ?? null;
 
-  const handleCreateProfile = async ({navigation}: any) => {
+  const handlePickImage = async () => {
+    if (isSubmitting) return;
+    // pickImage handles its own permission / error alerts and returns null on
+    // cancel or failure, so there's nothing to catch here.
+    const img = await pickImage();
+    if (img) setPickedImage(img);
+  };
+
+  const handleRemoveImage = () => {
+    if (isSubmitting) return;
+    setPickedImage(null);
+  };
+
+  const handleCreateProfile = async () => {
     // 1. Validation
     if (!businessName.trim()) {
       Alert.alert("Missing Info", "Please enter your shop or business name.");
@@ -50,6 +68,20 @@ const VendorSetUpScreen = () => {
         businessName: businessName.trim(),
         businessPhone: businessPhone.trim()
       });
+
+      // 3. The vendor profile now exists, so the image can be attached to it.
+      // A failed upload must not undo the created shop — the vendor can always
+      // add or change the photo later from the Profile screen.
+      if (pickedImage) {
+        try {
+          await uploadVendorImage(pickedImage);
+        } catch (imgError: any) {
+          Alert.alert(
+            "Photo not uploaded",
+            imgError?.message ?? "Your shop was created, but the photo couldn't be uploaded. You can add it later from your profile."
+          );
+        }
+      }
     } catch (error: any) {
       Alert.alert("Setup Failed", error.message || "Something went wrong. Please try again.");
     } finally {
@@ -78,12 +110,73 @@ const VendorSetUpScreen = () => {
 
           {/* Header Section */}
           <View style={styles.header}>
-            <View style={styles.iconCircle}>
-              <Text style={styles.iconText}>🏪</Text>
-            </View>
             <Text style={styles.title}>Set Up Your Shop</Text>
             <Text style={styles.subtitle}>
-              Just two details and you're ready to start taking orders.
+              Add your shop photo and two details, and you're ready to start taking orders.
+            </Text>
+          </View>
+
+          {/* Shop photo upload box */}
+          <View style={styles.uploadSection}>
+            <View style={styles.uploadLabelRow}>
+              <Text style={styles.uploadLabel}>Shop Photo</Text>
+              <View style={styles.optionalChip}>
+                <Text style={styles.optionalChipText}>OPTIONAL</Text>
+              </View>
+            </View>
+
+            {imageUri ? (
+              <View style={styles.previewWrap}>
+                <Image source={{ uri: imageUri }} style={styles.previewImage} resizeMode="cover" />
+                <View style={styles.previewActions}>
+                  <TouchableOpacity
+                    style={styles.previewBtn}
+                    onPress={handlePickImage}
+                    disabled={isSubmitting}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Change shop photo"
+                  >
+                    <Feather name="refresh-ccw" size={15} color="#2563EB" />
+                    <Text style={styles.previewBtnText}>Change</Text>
+                  </TouchableOpacity>
+                  <View style={styles.previewActionDivider} />
+                  <TouchableOpacity
+                    style={styles.previewBtn}
+                    onPress={handleRemoveImage}
+                    disabled={isSubmitting}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove shop photo"
+                  >
+                    <Feather name="trash-2" size={15} color="#DC2626" />
+                    <Text style={[styles.previewBtnText, styles.previewRemoveText]}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.uploadBox}
+                onPress={handlePickImage}
+                activeOpacity={0.7}
+                disabled={isSubmitting}
+                accessibilityRole="button"
+                accessibilityLabel="Upload shop photo"
+              >
+                <View style={styles.uploadIconCircle}>
+                  <Feather name="image" size={26} color="#2563EB" />
+                </View>
+                <Text style={styles.uploadBoxTitle}>Upload shop photo</Text>
+                <Text style={styles.uploadBoxHint}>Tap to choose a photo from your gallery</Text>
+                <View style={styles.uploadCta}>
+                  <Feather name="upload" size={14} color="#FFFFFF" />
+                  <Text style={styles.uploadCtaText}>Choose image</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            <Text style={styles.uploadCaption}>
+              You can add or change this anytime from your profile.
             </Text>
           </View>
 
@@ -170,17 +263,124 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     alignItems: 'center',
   },
-  iconCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: '#E7ECFB',
+  uploadSection: {
+    width: '100%',
+    marginBottom: 24,
+  },
+  uploadLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  uploadLabel: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  optionalChip: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  optionalChipText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#4F46E5',
+    letterSpacing: 0.4,
+  },
+  uploadBox: {
+    borderWidth: 2,
+    borderColor: '#BFD3F5',
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    backgroundColor: '#F5F8FF',
+    paddingVertical: 28,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 18,
   },
-  iconText: {
-    fontSize: 34,
+  uploadIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E7EEFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  uploadBoxTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1E3A8A',
+    marginBottom: 4,
+  },
+  uploadBoxHint: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  uploadCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  uploadCtaText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  previewWrap: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+  },
+  previewImage: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#E7ECFB',
+  },
+  previewActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  previewBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 13,
+  },
+  previewBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  previewRemoveText: {
+    color: '#DC2626',
+  },
+  previewActionDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    backgroundColor: '#E2E8F0',
+  },
+  uploadCaption: {
+    fontSize: 12.5,
+    color: '#94A3B8',
+    fontWeight: '500',
+    marginTop: 10,
+    textAlign: 'center',
   },
   title: {
     fontSize: 26,

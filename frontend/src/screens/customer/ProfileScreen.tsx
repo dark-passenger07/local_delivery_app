@@ -1,14 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, ScrollView, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { useAuthStore } from '../../context/vendorContext/AuthContext';
 
 const ProfileScreen = () => {
-  const { logout, user, authUser } = useAuthStore();
+  const { logout, user, authUser, updateProfile } = useAuthStore();
 
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [loggingOut, setLoggingOut] = useState<boolean>(false);
+
+  // --- Edit profile state ---
+  const [editVisible, setEditVisible] = useState<boolean>(false);
+  const [name, setName] = useState<string>('');
+  const [address, setAddress] = useState<string>('');
+  const [saving, setSaving] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -22,7 +29,7 @@ const ProfileScreen = () => {
       }
     };
     fetchUser();
-    
+
   }, []);
 
   const onRefresh = async () => {
@@ -41,6 +48,41 @@ const ProfileScreen = () => {
     const parts = name.trim().split(' ').filter(Boolean);
     if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
     return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  };
+
+  const openEdit = () => {
+    setName(user?.name ?? '');
+    setAddress(user?.address ?? '');
+    setEditVisible(true);
+  };
+
+  const closeEdit = () => {
+    if (saving) return;
+    setEditVisible(false);
+  };
+
+  const handleSaveProfile = async () => {
+    const n = name.trim();
+    const a = address.trim();
+
+    if (n.length < 2) {
+      Alert.alert('Check name', 'Your name must be at least 2 characters.');
+      return;
+    }
+    if (a.length < 2) {
+      Alert.alert('Check address', 'Your address must be at least 2 characters.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await updateProfile({ name: n, address: a });
+      setEditVisible(false);
+    } catch (error: any) {
+      Alert.alert('Update failed', error?.message ?? 'Could not update your profile. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleLogout = () => {
@@ -89,6 +131,16 @@ const ProfileScreen = () => {
       >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={openEdit}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Edit profile"
+          >
+            <Feather name="edit-2" size={14} color="#6366F1" />
+            <Text style={styles.editButtonText}>Edit</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.profileCard}>
@@ -133,6 +185,80 @@ const ProfileScreen = () => {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Edit profile modal */}
+      <Modal
+        visible={editVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeEdit}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalHandle} />
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.modalScrollContent}
+            >
+              <Text style={styles.modalTitle}>Edit profile</Text>
+
+              <Text style={styles.modalLabel}>Name</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={name}
+                onChangeText={setName}
+                placeholder="Your name"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="words"
+                editable={!saving}
+              />
+
+              <Text style={styles.modalLabel}>Address</Text>
+              <TextInput
+                style={[styles.modalInput, styles.modalInputMultiline]}
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Your delivery address"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="sentences"
+                multiline
+                editable={!saving}
+              />
+
+              <Text style={styles.modalHint}>
+                Your phone number can't be changed here.
+              </Text>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalCancelButton]}
+                  onPress={closeEdit}
+                  disabled={saving}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalSaveButton, saving && styles.modalSaveDisabled]}
+                  onPress={handleSaveProfile}
+                  disabled={saving}
+                  activeOpacity={0.85}
+                >
+                  {saving ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.modalSaveText}>Save changes</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -144,8 +270,20 @@ const styles = StyleSheet.create({
 
   scrollContent: { paddingHorizontal: 20, paddingBottom: 32, flexGrow: 1 },
 
-  header: { paddingTop: 12, paddingBottom: 16 },
+  header: { paddingTop: 12, paddingBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { fontSize: 26, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E0E2F0',
+    backgroundColor: '#FFFFFF',
+  },
+  editButtonText: { color: '#6366F1', fontSize: 14, fontWeight: '700' },
 
   profileCard: {
     backgroundColor: '#FFFFFF',
@@ -216,7 +354,68 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  logoutButtonText: { color: '#DC2626', fontWeight: '700', fontSize: 15 }
+  logoutButtonText: { color: '#DC2626', fontWeight: '700', fontSize: 15 },
+
+  // --- Edit modal ---
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(17, 24, 39, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 24,
+    maxHeight: '90%',
+  },
+  modalHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E5E7EB',
+    marginBottom: 14,
+  },
+  modalScrollContent: { paddingBottom: 8 },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 18 },
+  modalLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginBottom: 7,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  modalInput: {
+    backgroundColor: '#F5F6FA',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    fontSize: 15,
+    color: '#111827',
+    fontWeight: '500',
+    marginBottom: 16,
+  },
+  modalInputMultiline: { minHeight: 70, textAlignVertical: 'top' },
+  modalHint: { fontSize: 12.5, color: '#9CA3AF', fontWeight: '500', marginBottom: 20 },
+  modalActions: { flexDirection: 'row', gap: 12 },
+  modalButton: {
+    flex: 1,
+    height: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelButton: { backgroundColor: '#F0F1F5' },
+  modalCancelText: { color: '#6B7280', fontSize: 16, fontWeight: '700' },
+  modalSaveButton: { backgroundColor: '#6366F1' },
+  modalSaveDisabled: { backgroundColor: '#A5B4FC' },
+  modalSaveText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });
 
 export default ProfileScreen;
