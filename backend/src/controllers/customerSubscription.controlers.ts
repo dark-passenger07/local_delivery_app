@@ -140,7 +140,7 @@ export const subscribeProduct = async (req: Request, res: Response) => {
     await sendNotification(
       vendorData.userId,
       `🎉 New Subscriber!`,
-      `${user.name} just subscribed to your product, ${product.productName}.`
+      `${user.name} just subscribed to your product, ${product.productName} at price ${price}.`
     );
 
 
