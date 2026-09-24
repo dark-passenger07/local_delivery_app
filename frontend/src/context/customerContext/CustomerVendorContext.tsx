@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import { axiosInstance } from "../../api/axios"
 import { useCustomerHomeContext } from "./CustomerHomeContext"
+import type { ProductPriceHistoryEntry } from "../../components/PriceHistoryModal"
 
 // one api to fetch vendor profile
 
@@ -21,6 +22,8 @@ interface VendorProductsTypes {
   description: string
   vendor: VendorType
   unit: string
+  // Per-unit price set by the vendor. Prisma Decimal serializes to a string.
+  price: string
 }
 
 interface VendorProfileState {
@@ -42,16 +45,23 @@ interface CustomerVendorState {
   vendorProfiles: VendorProfileState[]
   getAllVendorProducts: (vendorId: string) => Promise<void>
   getAllVendorProfile: () => Promise<void>
-  subscribeProduct: (id: string, dailyQuantity: string, startDate: string, price: string) => Promise<void>
+  subscribeProduct: (id: string, dailyQuantity: string, startDate: string) => Promise<void>
   updateVendorProducts: (newProduct: VendorProductsTypes) => void
   clearVendorProducts: () => void;
   updateProductAfterDelete: (id: string) => void
+  getProductPriceHistory: (id: string) => Promise<ProductPriceHistoryEntry[]>
 }
 
 interface VendorProductApiResponse {
   message: string
   success: boolean
   vendorProducts: VendorProductsTypes[]
+}
+
+interface PriceHistoryResponse {
+  message: string
+  success: boolean
+  priceHistory: ProductPriceHistoryEntry[]
 }
 
 export const useCustomerVendorStore = create<CustomerVendorState>()((set,get) => ({
@@ -82,12 +92,11 @@ export const useCustomerVendorStore = create<CustomerVendorState>()((set,get) =>
     }
   },
   clearVendorProducts: () => set({ vendorProducts: [] }),
-  subscribeProduct: async(id: string, dailyQuantity: string, startDate: string, price: string) =>{
+  subscribeProduct: async(id: string, dailyQuantity: string, startDate: string) =>{
     try {
       const res = await axiosInstance.post(`/subscription/product/add/${id}`, {
         dailyQuantity,
-        startDate,
-        price
+        startDate
       })
       if(res.data.success){
         await useCustomerHomeContext.getState().getCustomerSubscribedProducts()
@@ -102,8 +111,13 @@ export const useCustomerVendorStore = create<CustomerVendorState>()((set,get) =>
       set((state)=>{
         const exists = state.vendorProducts.some((p) => p.id === newProduct.id);
         return {
-          vendorProducts: exists? state.vendorProducts : [newProduct, ...state.vendorProducts]
-        } 
+          // Upsert: if the product is already in the list (e.g. the vendor
+          // edited its price), replace it in place so the new price shows
+          // immediately; otherwise prepend it as a brand-new product.
+          vendorProducts: exists
+            ? state.vendorProducts.map((p) => (p.id === newProduct.id ? newProduct : p))
+            : [newProduct, ...state.vendorProducts]
+        }
       })
     } catch (error: any) {
       const message = error?.response?.data?.message ?? error?.response?.data?.error ?? error.message ?? "Something went wrong";
@@ -112,6 +126,18 @@ export const useCustomerVendorStore = create<CustomerVendorState>()((set,get) =>
   },
   updateProductAfterDelete: (productId) => set((state) =>({
     vendorProducts: state.vendorProducts.filter((product) => product.id != productId)
-  }))
+  })),
+  getProductPriceHistory: async (id: string) => {
+    try {
+      const res = await axiosInstance.get<PriceHistoryResponse>(`/product/price-history/${id}`)
+      if (res.data.success) {
+        return res.data.priceHistory
+      }
+      return []
+    } catch (error: any) {
+      const message = error?.response?.data?.message ?? error?.response?.data?.error ?? error.message ?? "Something went wrong";
+      throw new Error(message);
+    }
+  }
 
 }))

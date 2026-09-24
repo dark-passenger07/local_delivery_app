@@ -18,6 +18,9 @@ type newProductType = {
   description: string
   vendor: VendorType
   unit: string
+  // Per-unit price (Prisma Decimal serialized to a string) — the backend
+  // includes it on add/update product socket events.
+  price: string
 }
 
 type ProductType = {

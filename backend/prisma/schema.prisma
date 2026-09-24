@@ -103,6 +103,12 @@ model Product {
   /// @zod.string.min(2, {message: "Product description must be of at leat 2 characters"})
   description String
   unit        ProductUnit
+  /// Per-unit selling price set by the vendor when the product is created (and
+  /// editable later). A customer no longer enters a price at subscribe time:
+  /// the product's current price is snapshotted onto the subscription, so
+  /// later edits to this field only affect NEW subscriptions. Defaults to 0 so
+  /// products created before this field existed stay valid until re-priced.
+  price       Decimal     @default(0) @db.Decimal(10, 2)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
@@ -110,6 +116,29 @@ model Product {
 
   subscription CustomerSubscription[]
   request      Requests[]
+  priceHistory ProductPriceHistory[]
+}
+
+/// Audit log of a product's per-unit price over time so both the vendor and
+/// their customers can see when the vendor changed the price and what it was
+/// before. The first row is seeded when the product is created (oldPrice = null,
+/// newPrice = the creation price); every later row is written only when the
+/// price actually changes (oldPrice = previous price, newPrice = new price).
+/// This is product-level history — distinct from SubscriptionPrice, which is a
+/// per-customer, per-subscription price override timeline used for revenue.
+model ProductPriceHistory {
+  id        String   @id @default(uuid())
+  productId String
+  /// Previous per-unit price. Null on the creation entry (there was no price
+  /// before the product existed).
+  oldPrice  Decimal? @db.Decimal(10, 2)
+  /// The per-unit price this record set the product to.
+  newPrice  Decimal  @db.Decimal(10, 2)
+  changedAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, changedAt])
 }
 
 model VendorCustomers {
@@ -137,7 +166,10 @@ model CustomerSubscription {
   startDate        DateTime
   endDate          DateTime?
   dailyQuantity    Decimal             @db.Decimal(10, 2)
-  /// Price per single unit of the product, entered by the customer at subscribe time.
+  /// Per-unit price for this subscription, snapshotted from the product's price
+  /// at subscribe time. Kept on the subscription so later edits to the product
+  /// price don't retroactively change this customer's revenue. Vendors can still
+  /// override it per-customer via the SubscriptionPrice history.
   /// Revenue = delivered quantity (after skip/increase/decrease requests) x price.
   price            Decimal             @default(0) @db.Decimal(10, 2)
   status           SubscriptionStatus  @default(ACTIVE)
