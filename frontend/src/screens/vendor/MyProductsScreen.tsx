@@ -10,6 +10,9 @@ import {
   ActivityIndicator,
   RefreshControl,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   TouchableWithoutFeedback,
   Alert,
 } from 'react-native'
@@ -399,101 +402,121 @@ export const MyProductsScreen = () => {
         transparent
         visible={isModalOpen}
         onRequestClose={() => setIsModalOpen(false)}
+        statusBarTranslucent
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={[styles.modalContent, { paddingBottom: insets.bottom + SPACING.md }]}>
-                <View style={styles.modalHandle} />
-                <Text style={styles.modalTitle}>Add new product</Text>
-                <Text style={styles.modalSubtitle}>
-                  Fill in the details below to add it to your catalog.
-                </Text>
-
-                {errorMessage && (
-                  <View style={styles.errorBanner}>
-                    <Feather name="alert-circle" size={15} color={COLORS.danger} />
-                    <Text style={styles.errorText}>{errorMessage}</Text>
-                  </View>
-                )}
-
-                <Text style={styles.inputLabel}>Product name</Text>
-                <TextInput
-                  style={styles.inputField}
-                  placeholder="e.g. milk, water, newspaper..."
-                  placeholderTextColor={COLORS.textTertiary}
-                  value={productName}
-                  onChangeText={setProductName}
-                  editable={!isSubmitting}
-                />
-
-                 <Text style={styles.inputLabel}>Description</Text>
-                 <TextInput
-                   style={[styles.inputField, styles.inputMultiline]}
-                   placeholder="Briefly describe the product"
-                   placeholderTextColor={COLORS.textTertiary}
-                   value={description}
-                   onChangeText={setDescription}
-                   multiline
-                   textAlignVertical="top"
-                   editable={!isSubmitting}
-                 />
-
-                 <Text style={styles.inputLabel}>Unit</Text>
-                 <View style={styles.unitRow}>
-                   {['PIECE', 'PACKET', 'BOTTLE', 'LITRE', 'ML', 'KG', 'GRAM', 'DOZEN'].map((u) => {
-                     const selected = unit === u
-                     return (
-                       <TouchableOpacity
-                         key={u}
-                         style={[styles.unitChip, selected && styles.unitChipSelected]}
-                         onPress={() => setUnit(u)}
-                         activeOpacity={0.8}
-                       >
-                         <Text style={[styles.unitChipText, selected && styles.unitChipTextSelected]}>
-                           {u}
-                         </Text>
-                       </TouchableOpacity>
-                     )
-                   })}
-                 </View>
-
-                 <Text style={styles.inputLabel}>Price per {unit.toLowerCase()} (₹)</Text>
-                 <TextInput
-                   style={styles.inputField}
-                   placeholder="e.g. 30"
-                   placeholderTextColor={COLORS.textTertiary}
-                   value={price}
-                   onChangeText={setPrice}
-                   keyboardType="decimal-pad"
-                   editable={!isSubmitting}
-                 />
-
-                 <View style={styles.buttonRow}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.cancelBtn]}
-                    onPress={() => setIsModalOpen(false)}
-                    disabled={isSubmitting}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          style={styles.modalOverlay}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalFlexEnd}>
+              <TouchableWithoutFeedback>
+                <View style={[styles.modalContent, { maxHeight: '90%', paddingBottom: Math.max(insets.bottom + SPACING.md, SPACING.lg) }]}>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    automaticallyAdjustKeyboardInsets
+                    contentContainerStyle={{ flexGrow: 1 }}
                   >
-                    <Text style={styles.cancelBtnText}>Cancel</Text>
-                  </TouchableOpacity>
+                    <View style={styles.modalHandle} />
+                    <Text style={styles.modalTitle}>Add new product</Text>
+                    <Text style={styles.modalSubtitle}>
+                      Fill in the details below to add it to your catalog.
+                    </Text>
 
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
-                    onPress={handleAddProduct}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <ActivityIndicator color={COLORS.white} size="small" />
-                    ) : (
-                      <Text style={styles.submitBtnText}>Add product</Text>
+                    {errorMessage && (
+                      <View style={styles.errorBanner}>
+                        <Feather name="alert-circle" size={15} color={COLORS.danger} />
+                        <Text style={styles.errorText}>{errorMessage}</Text>
+                      </View>
                     )}
-                  </TouchableOpacity>
+
+                    <Text style={styles.inputLabel}>Product name</Text>
+                    <TextInput
+                      style={styles.inputField}
+                      placeholder="e.g. milk, water, newspaper..."
+                      placeholderTextColor={COLORS.textTertiary}
+                      value={productName}
+                      onChangeText={setProductName}
+                      editable={!isSubmitting}
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                    />
+
+                    <Text style={styles.inputLabel}>Description</Text>
+                    <TextInput
+                      style={[styles.inputField, styles.inputMultiline]}
+                      placeholder="Briefly describe the product"
+                      placeholderTextColor={COLORS.textTertiary}
+                      value={description}
+                      onChangeText={setDescription}
+                      multiline
+                      textAlignVertical="top"
+                      editable={!isSubmitting}
+                      returnKeyType="next"
+                      blurOnSubmit
+                    />
+
+                    <Text style={styles.inputLabel}>Unit</Text>
+                    <View style={styles.unitRow}>
+                      {['PIECE', 'PACKET', 'BOTTLE', 'LITRE', 'ML', 'KG', 'GRAM', 'DOZEN'].map((u) => {
+                        const selected = unit === u
+                        return (
+                          <TouchableOpacity
+                            key={u}
+                            style={[styles.unitChip, selected && styles.unitChipSelected]}
+                            onPress={() => setUnit(u)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.unitChipText, selected && styles.unitChipTextSelected]}>
+                              {u}
+                            </Text>
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </View>
+
+                    <Text style={styles.inputLabel}>Price per {unit.toLowerCase()} (₹)</Text>
+                    <TextInput
+                      style={styles.inputField}
+                      placeholder="e.g. 30"
+                      placeholderTextColor={COLORS.textTertiary}
+                      value={price}
+                      onChangeText={setPrice}
+                      keyboardType="decimal-pad"
+                      editable={!isSubmitting}
+                      returnKeyType="done"
+                      blurOnSubmit
+                    />
+
+                    <View style={styles.buttonRow}>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.cancelBtn]}
+                        onPress={() => setIsModalOpen(false)}
+                        disabled={isSubmitting}
+                      >
+                        <Text style={styles.cancelBtnText}>Cancel</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
+                        onPress={handleAddProduct}
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <ActivityIndicator color={COLORS.white} size="small" />
+                        ) : (
+                          <Text style={styles.submitBtnText}>Add product</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </ScrollView>
                 </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Edit Price Modal */}
@@ -502,65 +525,82 @@ export const MyProductsScreen = () => {
         transparent
         visible={isEditOpen}
         onRequestClose={closeEditModal}
+        statusBarTranslucent
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={[styles.modalContent, { paddingBottom: insets.bottom + SPACING.md }]}>
-                <View style={styles.modalHandle} />
-                <Text style={styles.modalTitle}>Edit price</Text>
-                <Text style={styles.modalSubtitle}>
-                  {editingProduct
-                    ? `Update the price for ${editingProduct.productName}. This only affects new subscriptions — existing customers keep their current price.`
-                    : 'Update the price for this product.'}
-                </Text>
-
-                {editError && (
-                  <View style={styles.errorBanner}>
-                    <Feather name="alert-circle" size={15} color={COLORS.danger} />
-                    <Text style={styles.errorText}>{editError}</Text>
-                  </View>
-                )}
-
-                <Text style={styles.inputLabel}>
-                  Price per {String(editingProduct?.unit || 'unit').toLowerCase()} (₹)
-                </Text>
-                <TextInput
-                  style={styles.inputField}
-                  placeholder="e.g. 30"
-                  placeholderTextColor={COLORS.textTertiary}
-                  value={editPrice}
-                  onChangeText={setEditPrice}
-                  keyboardType="decimal-pad"
-                  editable={!isEditing}
-                  autoFocus
-                />
-
-                <View style={styles.buttonRow}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.cancelBtn]}
-                    onPress={closeEditModal}
-                    disabled={isEditing}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          style={styles.modalOverlay}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalFlexEnd}>
+              <TouchableWithoutFeedback>
+                <View style={[styles.modalContent, { maxHeight: '90%', paddingBottom: Math.max(insets.bottom + SPACING.md, SPACING.lg) }]}>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    automaticallyAdjustKeyboardInsets
+                    contentContainerStyle={{ flexGrow: 1 }}
                   >
-                    <Text style={styles.cancelBtnText}>Cancel</Text>
-                  </TouchableOpacity>
+                    <View style={styles.modalHandle} />
+                    <Text style={styles.modalTitle}>Edit price</Text>
+                    <Text style={styles.modalSubtitle}>
+                      {editingProduct
+                        ? `Update the price for ${editingProduct.productName}. This only affects new subscriptions — existing customers keep their current price.`
+                        : 'Update the price for this product.'}
+                    </Text>
 
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.submitBtn, isEditing && styles.submitBtnDisabled]}
-                    onPress={handleUpdatePrice}
-                    disabled={isEditing}
-                  >
-                    {isEditing ? (
-                      <ActivityIndicator color={COLORS.white} size="small" />
-                    ) : (
-                      <Text style={styles.submitBtnText}>Save price</Text>
+                    {editError && (
+                      <View style={styles.errorBanner}>
+                        <Feather name="alert-circle" size={15} color={COLORS.danger} />
+                        <Text style={styles.errorText}>{editError}</Text>
+                      </View>
                     )}
-                  </TouchableOpacity>
+
+                    <Text style={styles.inputLabel}>
+                      Price per {String(editingProduct?.unit || 'unit').toLowerCase()} (₹)
+                    </Text>
+                    <TextInput
+                      style={styles.inputField}
+                      placeholder="e.g. 30"
+                      placeholderTextColor={COLORS.textTertiary}
+                      value={editPrice}
+                      onChangeText={setEditPrice}
+                      keyboardType="decimal-pad"
+                      editable={!isEditing}
+                      autoFocus
+                      returnKeyType="done"
+                      blurOnSubmit
+                      onSubmitEditing={handleUpdatePrice}
+                    />
+
+                    <View style={styles.buttonRow}>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.cancelBtn]}
+                        onPress={closeEditModal}
+                        disabled={isEditing}
+                      >
+                        <Text style={styles.cancelBtnText}>Cancel</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.submitBtn, isEditing && styles.submitBtnDisabled]}
+                        onPress={handleUpdatePrice}
+                        disabled={isEditing}
+                      >
+                        {isEditing ? (
+                          <ActivityIndicator color={COLORS.white} size="small" />
+                        ) : (
+                          <Text style={styles.submitBtnText}>Save price</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </ScrollView>
                 </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       <PriceHistoryModal
@@ -781,6 +821,10 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: COLORS.overlay,
+    justifyContent: 'flex-end',
+  },
+  modalFlexEnd: {
+    flex: 1,
     justifyContent: 'flex-end',
   },
   modalContent: {

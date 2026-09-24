@@ -9,8 +9,11 @@ import {
   Alert,
   Modal,
   TextInput,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -419,97 +422,115 @@ export default function CustomerSubscriptionsScreen() {
         transparent
         animationType="fade"
         onRequestClose={closePriceModal}
+        statusBarTranslucent
       >
         <KeyboardAvoidingView
           style={styles.modalBackdrop}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.modalTitle}>Update price</Text>
-                <Text style={styles.modalSubtitle} numberOfLines={1}>
-                  {priceTarget?.product.productName} · {customerName}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={closePriceModal}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-              >
-                <Feather name="x" size={20} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.inputLabel}>
-              Price per {priceTarget?.product.unit?.toLowerCase() ?? 'unit'} (₹)
-            </Text>
-            <TextInput
-              style={styles.priceInput}
-              value={priceInput}
-              onChangeText={setPriceInput}
-              keyboardType="decimal-pad"
-              placeholder="0.00"
-              placeholderTextColor="#B4B2A9"
-              editable={!savingPrice}
-            />
-
-            <Text style={styles.inputLabel}>Apply from</Text>
-            <View style={styles.timingRow}>
-              {([
-                { key: 'NEXT_DAY' as PriceEffectiveFrom, title: 'From tomorrow', caption: formatLongDate(resolveEffectiveDate('NEXT_DAY')) },
-                { key: 'NEXT_MONTH' as PriceEffectiveFrom, title: 'From next month', caption: formatLongDate(resolveEffectiveDate('NEXT_MONTH')) },
-              ]).map((option) => {
-                const selected = priceTiming === option.key
-                return (
-                  <TouchableOpacity
-                    key={option.key}
-                    style={[styles.timingOption, selected && styles.timingOptionSelected]}
-                    onPress={() => setPriceTiming(option.key)}
-                    activeOpacity={0.8}
-                    disabled={savingPrice}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalCenterWrap}>
+              <TouchableWithoutFeedback>
+                <View style={[styles.modalCard, { maxHeight: '90%' }]}>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    automaticallyAdjustKeyboardInsets
+                    contentContainerStyle={{ flexGrow: 1 }}
                   >
-                    <Text style={[styles.timingTitle, selected && styles.timingTitleSelected]}>
-                      {option.title}
-                    </Text>
-                    <Text style={[styles.timingCaption, selected && styles.timingCaptionSelected]}>
-                      {option.caption}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              })}
-            </View>
+                    <View style={styles.modalHeader}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.modalTitle}>Update price</Text>
+                        <Text style={styles.modalSubtitle} numberOfLines={1}>
+                          {priceTarget?.product.productName} · {customerName}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={closePriceModal}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Close"
+                      >
+                        <Feather name="x" size={20} color="#64748B" />
+                      </TouchableOpacity>
+                    </View>
 
-            <Text style={styles.modalHint}>
-              Deliveries before the start date keep the current price, so revenue you have already earned does not change.
-            </Text>
+                    <Text style={styles.inputLabel}>
+                      Price per {priceTarget?.product.unit?.toLowerCase() ?? 'unit'} (₹)
+                    </Text>
+                    <TextInput
+                      style={styles.priceInput}
+                      value={priceInput}
+                      onChangeText={setPriceInput}
+                      keyboardType="decimal-pad"
+                      placeholder="0.00"
+                      placeholderTextColor="#B4B2A9"
+                      editable={!savingPrice}
+                      returnKeyType="done"
+                      blurOnSubmit
+                      onSubmitEditing={handleSavePrice}
+                    />
 
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={closePriceModal}
-                activeOpacity={0.8}
-                disabled={savingPrice}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSaveButton, savingPrice && styles.modalSaveButtonDisabled]}
-                onPress={handleSavePrice}
-                activeOpacity={0.8}
-                disabled={savingPrice}
-              >
-                {savingPrice ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.modalSaveText}>Save price</Text>
-                )}
-              </TouchableOpacity>
+                    <Text style={styles.inputLabel}>Apply from</Text>
+                    <View style={styles.timingRow}>
+                      {([
+                        { key: 'NEXT_DAY' as PriceEffectiveFrom, title: 'From tomorrow', caption: formatLongDate(resolveEffectiveDate('NEXT_DAY')) },
+                        { key: 'NEXT_MONTH' as PriceEffectiveFrom, title: 'From next month', caption: formatLongDate(resolveEffectiveDate('NEXT_MONTH')) },
+                      ]).map((option) => {
+                        const selected = priceTiming === option.key
+                        return (
+                          <TouchableOpacity
+                            key={option.key}
+                            style={[styles.timingOption, selected && styles.timingOptionSelected]}
+                            onPress={() => setPriceTiming(option.key)}
+                            activeOpacity={0.8}
+                            disabled={savingPrice}
+                            accessibilityRole="radio"
+                            accessibilityState={{ selected }}
+                          >
+                            <Text style={[styles.timingTitle, selected && styles.timingTitleSelected]}>
+                              {option.title}
+                            </Text>
+                            <Text style={[styles.timingCaption, selected && styles.timingCaptionSelected]}>
+                              {option.caption}
+                            </Text>
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </View>
+
+                    <Text style={styles.modalHint}>
+                      Deliveries before the start date keep the current price, so revenue you have already earned does not change.
+                    </Text>
+
+                    <View style={styles.modalActions}>
+                      <TouchableOpacity
+                        style={styles.modalCancelButton}
+                        onPress={closePriceModal}
+                        activeOpacity={0.8}
+                        disabled={savingPrice}
+                      >
+                        <Text style={styles.modalCancelText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.modalSaveButton, savingPrice && styles.modalSaveButtonDisabled]}
+                        onPress={handleSavePrice}
+                        activeOpacity={0.8}
+                        disabled={savingPrice}
+                      >
+                        {savingPrice ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Text style={styles.modalSaveText}>Save price</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </ScrollView>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
-          </View>
+          </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
@@ -635,6 +656,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(15, 23, 42, 0.45)",
     justifyContent: "center",
     paddingHorizontal: 22,
+  },
+  modalCenterWrap: {
+    flex: 1,
+    justifyContent: "center",
   },
   modalCard: {
     backgroundColor: "#FFFFFF",
