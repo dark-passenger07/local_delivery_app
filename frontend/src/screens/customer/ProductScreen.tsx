@@ -17,6 +17,7 @@ import DateTimePicker, { DateTimePickerChangeEvent } from '@react-native-communi
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useCustomerVendorStore } from '../../context/customerContext/CustomerVendorContext';
 import { useCustomerHomeContext } from '../../context/customerContext/CustomerHomeContext';
+import PriceHistoryModal, { ProductPriceHistoryEntry } from '../../components/PriceHistoryModal';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 
@@ -30,7 +31,7 @@ const ProductScreen = () => {
   const route = useRoute<RouteProp<ProductScreenRouteParams, 'ProductScreen'>>();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { vendorId } = route.params;
-  const { getAllVendorProducts, vendorProducts, clearVendorProducts, subscribeProduct } = useCustomerVendorStore();
+  const { getAllVendorProducts, vendorProducts, clearVendorProducts, subscribeProduct, getProductPriceHistory } = useCustomerVendorStore();
   const { getCustomerSubscribedProducts, subcribedProducts } = useCustomerHomeContext();
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -41,10 +42,16 @@ const ProductScreen = () => {
   const [subscribing, setSubscribing] = useState<boolean>(false);
   const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set());
   const [dailyQuantity, setDailyQuantity] = useState('1');
-  const [price, setPrice] = useState('');
   const [startDate, setStartDate] = useState('');
   const [startDateObj, setStartDateObj] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Price-history modal state
+  const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
+  const [historyProduct, setHistoryProduct] = useState<{ productName: string; unit: string } | null>(null);
+  const [historyEntries, setHistoryEntries] = useState<ProductPriceHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
    useEffect(() => {
     const fetchProducts = async () => {
@@ -119,7 +126,6 @@ const ProductScreen = () => {
 
   const initiateSubscriptionFlow = (productId: string) => {
     setSelectedProductId(productId);
-    setPrice('');
     setStartDate('');
     setStartDateObj(null);
     setShowDatePicker(false);
@@ -135,9 +141,15 @@ const ProductScreen = () => {
       return;
     }
 
-    const parsedPrice = Number(price);
-    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
-      Alert.alert('Invalid Price', 'Please enter a price per unit greater than 0.');
+    // Price now comes from the product itself (set by the vendor). Guard
+    // against products the vendor hasn't priced yet — the backend rejects
+    // these too, so surface a clear message before the request.
+    const productPrice = Number(activeProduct?.price) || 0;
+    if (productPrice <= 0) {
+      Alert.alert(
+        'Price not set',
+        "This product doesn't have a price yet. Please ask the vendor to set one before subscribing."
+      );
       return;
     }
 
@@ -148,7 +160,7 @@ const ProductScreen = () => {
 
     setSubscribing(true);
     try {
-      await subscribeProduct(selectedProductId, dailyQuantity, startDate, price)
+      await subscribeProduct(selectedProductId, dailyQuantity, startDate)
       setSubscribedIds((prev) => new Set(prev).add(selectedProductId));
       Alert.alert('Success', 'You have successfully subscribed to this product!');
     } catch (error: any) {
@@ -162,10 +174,32 @@ const ProductScreen = () => {
   const cancelSubscriptionFlow = () => {
     setIsConfirmOpen(false);
     setSelectedProductId(null);
-    setPrice('');
     setStartDate('');
     setStartDateObj(null);
     setShowDatePicker(false);
+  };
+
+  const openPriceHistory = async (product: { id: string; productName: string; unit: string }) => {
+    setHistoryProduct({ productName: product.productName, unit: product.unit });
+    setHistoryEntries([]);
+    setHistoryError(null);
+    setHistoryLoading(true);
+    setIsHistoryOpen(true);
+    try {
+      const entries = await getProductPriceHistory(product.id);
+      setHistoryEntries(entries);
+    } catch (error: any) {
+      setHistoryError(error.message || 'Failed to load price history');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const closePriceHistory = () => {
+    setIsHistoryOpen(false);
+    setHistoryProduct(null);
+    setHistoryEntries([]);
+    setHistoryError(null);
   };
 
   const activeProduct = vendorProducts.find((p) => p.id === selectedProductId);
@@ -210,6 +244,8 @@ const ProductScreen = () => {
         }
         renderItem={({ item }) => {
           const isSubscribed = subscribedIds.has(item.id);
+          const priceValue = Number(item.price) || 0;
+          const unitLabel = String(item.unit || 'unit').toLowerCase();
           return (
             <View style={styles.productCard}>
               <View style={styles.avatarCircle}>
@@ -220,6 +256,26 @@ const ProductScreen = () => {
                 <Text style={styles.productDescription} numberOfLines={2}>
                   {item.description}
                 </Text>
+                {priceValue > 0 ? (
+                  <TouchableOpacity
+                    onPress={() =>
+                      openPriceHistory({
+                        id: item.id,
+                        productName: item.productName,
+                        unit: String(item.unit || 'unit'),
+                      })
+                    }
+                    activeOpacity={0.7}
+                    style={styles.priceRow}
+                  >
+                    <Text style={styles.productPrice}>
+                      ₹{priceValue.toFixed(2)} <Text style={styles.productPriceUnit}>/ {unitLabel}</Text>
+                    </Text>
+                    <Text style={styles.priceHistoryHint}>🕘 history</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.productPriceMissing}>Price not set yet</Text>
+                )}
               </View>
               <TouchableOpacity
                 style={[styles.subscribeButton, isSubscribed && styles.subscribedButton]}
@@ -273,20 +329,20 @@ const ProductScreen = () => {
             </View>
 
             <View style={styles.formField}>
-              <Text style={styles.formLabel}>Price per unit (₹)</Text>
-              <TextInput
-                style={styles.formInput}
-                value={price}
-                onChangeText={setPrice}
-                keyboardType="numeric"
-                placeholder="e.g. 25"
-                placeholderTextColor="#9CA3AF"
-              />
-              {activeProduct?.unit ? (
-                <Text style={styles.priceHint}>
-                  Price for one {activeProduct.unit.toLowerCase()}. Revenue is calculated from the quantity delivered.
+              <Text style={styles.formLabel}>Price per unit</Text>
+              <View style={styles.priceDisplay}>
+                <Text style={styles.priceDisplayText}>
+                  {Number(activeProduct?.price) > 0
+                    ? `₹${Number(activeProduct?.price).toFixed(2)}`
+                    : 'Not set'}
                 </Text>
-              ) : null}
+                {activeProduct?.unit ? (
+                  <Text style={styles.priceDisplayUnit}>per {activeProduct.unit.toLowerCase()}</Text>
+                ) : null}
+              </View>
+              <Text style={styles.priceHint}>
+                Set by the vendor. Your bill is this price × the quantity delivered.
+              </Text>
             </View>
 
             <View style={styles.formField}>
@@ -335,6 +391,16 @@ const ProductScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <PriceHistoryModal
+        visible={isHistoryOpen}
+        onClose={closePriceHistory}
+        productName={historyProduct?.productName}
+        unit={historyProduct?.unit}
+        entries={historyEntries}
+        loading={historyLoading}
+        error={historyError}
+      />
     </SafeAreaView>
   );
 };
@@ -408,6 +474,11 @@ const styles = StyleSheet.create({
   productInfo: { flex: 1, paddingRight: 10 },
   productName: { fontSize: 16, fontWeight: '700', color: '#111827' },
   productDescription: { fontSize: 13, color: '#6B7280', marginTop: 2, lineHeight: 18 },
+  productPrice: { fontSize: 14, fontWeight: '800', color: '#4F46E5', marginTop: 6 },
+  productPriceUnit: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
+  productPriceMissing: { fontSize: 12, fontWeight: '600', color: '#DC2626', marginTop: 6 },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  priceHistoryHint: { fontSize: 11, fontWeight: '700', color: '#6366F1', marginTop: 6 },
 
   subscribeButton: {
     backgroundColor: '#6366F1',
@@ -498,6 +569,20 @@ const styles = StyleSheet.create({
    placeholderText: { fontSize: 14, color: '#9CA3AF', fontWeight: '600' },
 
    priceHint: { fontSize: 12, color: '#6B7280', marginTop: 6, lineHeight: 16 },
+
+   priceDisplay: {
+     flexDirection: 'row',
+     alignItems: 'baseline',
+     gap: 8,
+     borderWidth: 1.5,
+     borderColor: '#E5E7EB',
+     borderRadius: 12,
+     paddingHorizontal: 14,
+     paddingVertical: 12,
+     backgroundColor: '#F3F4FF',
+   },
+   priceDisplayText: { fontSize: 18, fontWeight: '800', color: '#4F46E5' },
+   priceDisplayUnit: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
 
    unitBadge: {
      alignSelf: 'center',

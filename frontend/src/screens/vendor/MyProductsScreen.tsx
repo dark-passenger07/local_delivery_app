@@ -10,12 +10,16 @@ import {
   ActivityIndicator,
   RefreshControl,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   TouchableWithoutFeedback,
   Alert,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Feather } from '@expo/vector-icons'
 import { useProductStore } from '../../context/vendorContext/ProductContext'
+import PriceHistoryModal, { ProductPriceHistoryEntry } from '../../components/PriceHistoryModal'
 
 // ---------------------------------------------------------------------------
 // Design tokens — 8dp spacing scale + a small, consistent color palette.
@@ -55,8 +59,10 @@ const getProductColor = (id: string) => {
   return PRODUCT_COLORS[sum % PRODUCT_COLORS.length]
 }
 
-const ProductCard = ({ item, onDelete }: any) => {
+const ProductCard = ({ item, onEdit, onDelete, onHistory }: any) => {
   const color = getProductColor(item.id)
+  const priceValue = Number(item.price) || 0
+  const unitLabel = String(item.unit || 'unit').toLowerCase()
 
   return (
     <View style={styles.productCard}>
@@ -71,23 +77,53 @@ const ProductCard = ({ item, onDelete }: any) => {
         <Text style={styles.productDesc} numberOfLines={2}>
           {item.description}
         </Text>
+        {priceValue > 0 ? (
+          <TouchableOpacity
+            style={styles.pricePill}
+            onPress={() => onHistory(item)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`View price history of ${item.productName}`}
+          >
+            <Text style={styles.pricePillText}>₹{priceValue.toFixed(2)}</Text>
+            <Text style={styles.pricePillUnit}> / {unitLabel}</Text>
+            <Feather name="clock" size={12} color={COLORS.primaryText} style={styles.pricePillIcon} />
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.pricePill, styles.pricePillEmpty]}>
+            <Feather name="alert-circle" size={12} color={COLORS.danger} />
+            <Text style={styles.pricePillEmptyText}>No price set — tap edit</Text>
+          </View>
+        )}
       </View>
 
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel={`Delete ${item.productName}`}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        style={styles.deleteButton}
-        onPress={() => onDelete(item.id)}
-      >
-        <Feather name="trash-2" size={17} color={COLORS.danger} />
-      </TouchableOpacity>
+      <View style={styles.cardActions}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`Edit price of ${item.productName}`}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={styles.editButton}
+          onPress={() => onEdit(item)}
+        >
+          <Feather name="edit-2" size={16} color={COLORS.primary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`Delete ${item.productName}`}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={styles.deleteButton}
+          onPress={() => onDelete(item.id)}
+        >
+          <Feather name="trash-2" size={17} color={COLORS.danger} />
+        </TouchableOpacity>
+      </View>
     </View>
   )
 }
 
 export const MyProductsScreen = () => {
-  const { allProducts, getAllProducts, addProduct, removeProduct } = useProductStore()
+  const { allProducts, getAllProducts, addProduct, updateProduct, removeProduct, getProductPriceHistory } = useProductStore()
   const insets = useSafeAreaInsets()
 
   // Component Local States
@@ -95,8 +131,23 @@ export const MyProductsScreen = () => {
   const [productName, setProductName] = useState('')
   const [description, setDescription] = useState('')
   const [unit, setUnit] = useState('PIECE')
+  const [price, setPrice] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  // Edit-price modal state (kept separate from the add flow).
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<any | null>(null)
+  const [editPrice, setEditPrice] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  // Price-history modal state
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [historyProduct, setHistoryProduct] = useState<{ productName: string; unit: string } | null>(null)
+  const [historyEntries, setHistoryEntries] = useState<ProductPriceHistoryEntry[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
 
   // Pull-to-refresh state, tracked separately from the first load
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -143,20 +194,92 @@ export const MyProductsScreen = () => {
       return
     }
 
+    const parsedPrice = Number(price)
+    if (!price.trim() || !Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      setErrorMessage('Please enter a price greater than 0.')
+      return
+    }
+
     setErrorMessage(null)
     setIsSubmitting(true)
 
     try {
-      await addProduct({ productName, description, unit })
+      await addProduct({ productName, description, unit, price: String(parsedPrice) })
       setProductName('')
       setDescription('')
       setUnit('PIECE')
+      setPrice('')
       setIsModalOpen(false)
     } catch (error: any) {
       setErrorMessage(error.message || 'Something went wrong.')
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const openEditModal = useCallback((item: any) => {
+    setEditingProduct(item)
+    const current = Number(item?.price) || 0
+    setEditPrice(current > 0 ? String(current) : '')
+    setEditError(null)
+    setIsEditOpen(true)
+  }, [])
+
+  const closeEditModal = () => {
+    if (isEditing) return
+    setIsEditOpen(false)
+    setEditingProduct(null)
+    setEditPrice('')
+    setEditError(null)
+  }
+
+  const handleUpdatePrice = async () => {
+    if (!editingProduct) return
+
+    const parsedPrice = Number(editPrice)
+    if (!editPrice.trim() || !Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      setEditError('Please enter a price greater than 0.')
+      return
+    }
+
+    setEditError(null)
+    setIsEditing(true)
+    try {
+      await updateProduct(editingProduct.id, String(parsedPrice))
+      setIsEditOpen(false)
+      setEditingProduct(null)
+      setEditPrice('')
+    } catch (error: any) {
+      setEditError(error.message || 'Could not update the price.')
+    } finally {
+      setIsEditing(false)
+    }
+  }
+
+  const openPriceHistory = useCallback(
+    async (item: any) => {
+      setHistoryProduct({ productName: item.productName, unit: String(item.unit || 'unit') })
+      setHistoryEntries([])
+      setHistoryError(null)
+      setHistoryLoading(true)
+      setIsHistoryOpen(true)
+      try {
+        const entries = await getProductPriceHistory(item.id)
+        setHistoryEntries(entries)
+      } catch (error: any) {
+        setHistoryError(error?.message || 'Failed to load price history.')
+      } finally {
+        setHistoryLoading(false)
+      }
+    },
+    [getProductPriceHistory]
+  )
+
+  const closePriceHistory = () => {
+    setIsHistoryOpen(false)
+    setHistoryProduct(null)
+    setHistoryEntries([])
+    setHistoryError(null)
   }
 
   const handleDelete = useCallback(
@@ -236,7 +359,9 @@ export const MyProductsScreen = () => {
             tintColor={COLORS.primary}
           />
         }
-        renderItem={({ item }) => <ProductCard item={item} onDelete={handleDelete} />}
+        renderItem={({ item }) => (
+          <ProductCard item={item} onEdit={openEditModal} onDelete={handleDelete} onHistory={openPriceHistory} />
+        )}
       />
     )
   }
@@ -277,91 +402,216 @@ export const MyProductsScreen = () => {
         transparent
         visible={isModalOpen}
         onRequestClose={() => setIsModalOpen(false)}
+        statusBarTranslucent
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={[styles.modalContent, { paddingBottom: insets.bottom + SPACING.md }]}>
-                <View style={styles.modalHandle} />
-                <Text style={styles.modalTitle}>Add new product</Text>
-                <Text style={styles.modalSubtitle}>
-                  Fill in the details below to add it to your catalog.
-                </Text>
-
-                {errorMessage && (
-                  <View style={styles.errorBanner}>
-                    <Feather name="alert-circle" size={15} color={COLORS.danger} />
-                    <Text style={styles.errorText}>{errorMessage}</Text>
-                  </View>
-                )}
-
-                <Text style={styles.inputLabel}>Product name</Text>
-                <TextInput
-                  style={styles.inputField}
-                  placeholder="e.g. milk, water, newspaper..."
-                  placeholderTextColor={COLORS.textTertiary}
-                  value={productName}
-                  onChangeText={setProductName}
-                  editable={!isSubmitting}
-                />
-
-                 <Text style={styles.inputLabel}>Description</Text>
-                 <TextInput
-                   style={[styles.inputField, styles.inputMultiline]}
-                   placeholder="Briefly describe the product"
-                   placeholderTextColor={COLORS.textTertiary}
-                   value={description}
-                   onChangeText={setDescription}
-                   multiline
-                   textAlignVertical="top"
-                   editable={!isSubmitting}
-                 />
-
-                 <Text style={styles.inputLabel}>Unit</Text>
-                 <View style={styles.unitRow}>
-                   {['PIECE', 'PACKET', 'BOTTLE', 'LITRE', 'ML', 'KG', 'GRAM', 'DOZEN'].map((u) => {
-                     const selected = unit === u
-                     return (
-                       <TouchableOpacity
-                         key={u}
-                         style={[styles.unitChip, selected && styles.unitChipSelected]}
-                         onPress={() => setUnit(u)}
-                         activeOpacity={0.8}
-                       >
-                         <Text style={[styles.unitChipText, selected && styles.unitChipTextSelected]}>
-                           {u}
-                         </Text>
-                       </TouchableOpacity>
-                     )
-                   })}
-                 </View>
-
-                 <View style={styles.buttonRow}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.cancelBtn]}
-                    onPress={() => setIsModalOpen(false)}
-                    disabled={isSubmitting}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          style={styles.modalOverlay}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalFlexEnd}>
+              <TouchableWithoutFeedback>
+                <View style={[styles.modalContent, { maxHeight: '90%', paddingBottom: Math.max(insets.bottom + SPACING.md, SPACING.lg) }]}>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    automaticallyAdjustKeyboardInsets
+                    contentContainerStyle={{ flexGrow: 1 }}
                   >
-                    <Text style={styles.cancelBtnText}>Cancel</Text>
-                  </TouchableOpacity>
+                    <View style={styles.modalHandle} />
+                    <Text style={styles.modalTitle}>Add new product</Text>
+                    <Text style={styles.modalSubtitle}>
+                      Fill in the details below to add it to your catalog.
+                    </Text>
 
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
-                    onPress={handleAddProduct}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <ActivityIndicator color={COLORS.white} size="small" />
-                    ) : (
-                      <Text style={styles.submitBtnText}>Add product</Text>
+                    {errorMessage && (
+                      <View style={styles.errorBanner}>
+                        <Feather name="alert-circle" size={15} color={COLORS.danger} />
+                        <Text style={styles.errorText}>{errorMessage}</Text>
+                      </View>
                     )}
-                  </TouchableOpacity>
+
+                    <Text style={styles.inputLabel}>Product name</Text>
+                    <TextInput
+                      style={styles.inputField}
+                      placeholder="e.g. milk, water, newspaper..."
+                      placeholderTextColor={COLORS.textTertiary}
+                      value={productName}
+                      onChangeText={setProductName}
+                      editable={!isSubmitting}
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                    />
+
+                    <Text style={styles.inputLabel}>Description</Text>
+                    <TextInput
+                      style={[styles.inputField, styles.inputMultiline]}
+                      placeholder="Briefly describe the product"
+                      placeholderTextColor={COLORS.textTertiary}
+                      value={description}
+                      onChangeText={setDescription}
+                      multiline
+                      textAlignVertical="top"
+                      editable={!isSubmitting}
+                      returnKeyType="next"
+                      blurOnSubmit
+                    />
+
+                    <Text style={styles.inputLabel}>Unit</Text>
+                    <View style={styles.unitRow}>
+                      {['PIECE', 'PACKET', 'BOTTLE', 'LITRE', 'ML', 'KG', 'GRAM', 'DOZEN'].map((u) => {
+                        const selected = unit === u
+                        return (
+                          <TouchableOpacity
+                            key={u}
+                            style={[styles.unitChip, selected && styles.unitChipSelected]}
+                            onPress={() => setUnit(u)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.unitChipText, selected && styles.unitChipTextSelected]}>
+                              {u}
+                            </Text>
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </View>
+
+                    <Text style={styles.inputLabel}>Price per {unit.toLowerCase()} (₹)</Text>
+                    <TextInput
+                      style={styles.inputField}
+                      placeholder="e.g. 30"
+                      placeholderTextColor={COLORS.textTertiary}
+                      value={price}
+                      onChangeText={setPrice}
+                      keyboardType="decimal-pad"
+                      editable={!isSubmitting}
+                      returnKeyType="done"
+                      blurOnSubmit
+                    />
+
+                    <View style={styles.buttonRow}>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.cancelBtn]}
+                        onPress={() => setIsModalOpen(false)}
+                        disabled={isSubmitting}
+                      >
+                        <Text style={styles.cancelBtnText}>Cancel</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
+                        onPress={handleAddProduct}
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <ActivityIndicator color={COLORS.white} size="small" />
+                        ) : (
+                          <Text style={styles.submitBtnText}>Add product</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </ScrollView>
                 </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
+
+      {/* Edit Price Modal */}
+      <Modal
+        animationType="slide"
+        transparent
+        visible={isEditOpen}
+        onRequestClose={closeEditModal}
+        statusBarTranslucent
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          style={styles.modalOverlay}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalFlexEnd}>
+              <TouchableWithoutFeedback>
+                <View style={[styles.modalContent, { maxHeight: '90%', paddingBottom: Math.max(insets.bottom + SPACING.md, SPACING.lg) }]}>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    automaticallyAdjustKeyboardInsets
+                    contentContainerStyle={{ flexGrow: 1 }}
+                  >
+                    <View style={styles.modalHandle} />
+                    <Text style={styles.modalTitle}>Edit price</Text>
+                    <Text style={styles.modalSubtitle}>
+                      {editingProduct
+                        ? `Update the price for ${editingProduct.productName}. This only affects new subscriptions — existing customers keep their current price.`
+                        : 'Update the price for this product.'}
+                    </Text>
+
+                    {editError && (
+                      <View style={styles.errorBanner}>
+                        <Feather name="alert-circle" size={15} color={COLORS.danger} />
+                        <Text style={styles.errorText}>{editError}</Text>
+                      </View>
+                    )}
+
+                    <Text style={styles.inputLabel}>
+                      Price per {String(editingProduct?.unit || 'unit').toLowerCase()} (₹)
+                    </Text>
+                    <TextInput
+                      style={styles.inputField}
+                      placeholder="e.g. 30"
+                      placeholderTextColor={COLORS.textTertiary}
+                      value={editPrice}
+                      onChangeText={setEditPrice}
+                      keyboardType="decimal-pad"
+                      editable={!isEditing}
+                      autoFocus
+                      returnKeyType="done"
+                      blurOnSubmit
+                      onSubmitEditing={handleUpdatePrice}
+                    />
+
+                    <View style={styles.buttonRow}>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.cancelBtn]}
+                        onPress={closeEditModal}
+                        disabled={isEditing}
+                      >
+                        <Text style={styles.cancelBtnText}>Cancel</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.submitBtn, isEditing && styles.submitBtnDisabled]}
+                        onPress={handleUpdatePrice}
+                        disabled={isEditing}
+                      >
+                        {isEditing ? (
+                          <ActivityIndicator color={COLORS.white} size="small" />
+                        ) : (
+                          <Text style={styles.submitBtnText}>Save price</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </ScrollView>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <PriceHistoryModal
+        visible={isHistoryOpen}
+        onClose={closePriceHistory}
+        productName={historyProduct?.productName}
+        unit={historyProduct?.unit}
+        entries={historyEntries}
+        loading={historyLoading}
+        error={historyError}
+      />
     </View>
   )
 }
@@ -496,6 +746,53 @@ const styles = StyleSheet.create({
     marginTop: 3,
     lineHeight: 18,
   },
+  pricePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: SPACING.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.primarySurface,
+  },
+  pricePillText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: COLORS.primaryText,
+  },
+  pricePillUnit: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primaryText,
+    opacity: 0.75,
+  },
+  pricePillIcon: {
+    marginLeft: 6,
+    opacity: 0.85,
+  },
+  pricePillEmpty: {
+    backgroundColor: COLORS.dangerSurface,
+    gap: 5,
+  },
+  pricePillEmptyText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.danger,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  editButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.primarySurface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   deleteButton: {
     width: 40,
     height: 40,
@@ -524,6 +821,10 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: COLORS.overlay,
+    justifyContent: 'flex-end',
+  },
+  modalFlexEnd: {
+    flex: 1,
     justifyContent: 'flex-end',
   },
   modalContent: {

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, ScrollView, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuthStore } from '../../context/vendorContext/AuthContext';
 
 const ProfileScreen = () => {
   const { logout, user, authUser, updateProfile } = useAuthStore();
+  const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -192,17 +193,20 @@ const ProfileScreen = () => {
         transparent
         animationType="slide"
         onRequestClose={closeEdit}
+        statusBarTranslucent
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
           style={styles.modalOverlay}
         >
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { paddingBottom: Math.max(24, insets.bottom + 16) }]}>
             <View style={styles.modalHandle} />
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.modalScrollContent}
+              automaticallyAdjustKeyboardInsets
+              contentContainerStyle={[styles.modalScrollContent, { flexGrow: 1 }]}
             >
               <Text style={styles.modalTitle}>Edit profile</Text>
 
@@ -215,6 +219,8 @@ const ProfileScreen = () => {
                 placeholderTextColor="#9CA3AF"
                 autoCapitalize="words"
                 editable={!saving}
+                returnKeyType="next"
+                blurOnSubmit={false}
               />
 
               <Text style={styles.modalLabel}>Address</Text>
@@ -227,6 +233,8 @@ const ProfileScreen = () => {
                 autoCapitalize="sentences"
                 multiline
                 editable={!saving}
+                returnKeyType="done"
+                blurOnSubmit
               />
 
               <Text style={styles.modalHint}>

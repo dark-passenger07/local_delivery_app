@@ -14,7 +14,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -40,6 +40,7 @@ const COLORS = {
 
 const ProfileScreen = () => {
   const { logout } = useAuthStore();
+  const insets = useSafeAreaInsets();
   // Destructure vendorAccount from your store
   const { vendorProfileDetails, updateVendorProfile, uploadVendorImage } = useVendorContextStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
@@ -288,17 +289,20 @@ const ProfileScreen = () => {
         transparent
         animationType="slide"
         onRequestClose={closeEdit}
+        statusBarTranslucent
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
           style={styles.modalOverlay}
         >
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { paddingBottom: Math.max(24, insets.bottom + 16) }]}>
             <View style={styles.modalHandle} />
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.modalScrollContent}
+              automaticallyAdjustKeyboardInsets
+              contentContainerStyle={[styles.modalScrollContent, { flexGrow: 1 }]}
             >
               <Text style={styles.modalTitle}>Edit profile</Text>
 
@@ -337,6 +341,8 @@ const ProfileScreen = () => {
                 placeholderTextColor={COLORS.textTertiary}
                 autoCapitalize="words"
                 editable={!saving}
+                returnKeyType="next"
+                blurOnSubmit={false}
               />
 
               <Text style={styles.modalLabel}>Business name</Text>
@@ -348,6 +354,8 @@ const ProfileScreen = () => {
                 placeholderTextColor={COLORS.textTertiary}
                 autoCapitalize="words"
                 editable={!saving}
+                returnKeyType="next"
+                blurOnSubmit={false}
               />
 
               <Text style={styles.modalLabel}>Business phone</Text>
@@ -359,6 +367,8 @@ const ProfileScreen = () => {
                 placeholderTextColor={COLORS.textTertiary}
                 keyboardType="phone-pad"
                 editable={!saving}
+                returnKeyType="next"
+                blurOnSubmit={false}
               />
 
               <Text style={styles.modalLabel}>Address</Text>
@@ -371,6 +381,8 @@ const ProfileScreen = () => {
                 autoCapitalize="sentences"
                 multiline
                 editable={!saving}
+                returnKeyType="done"
+                blurOnSubmit
               />
 
               <Text style={styles.modalHint}>

@@ -8,7 +8,6 @@ const SubscriptionSchema = z.object({
   productId: z.string(),
   dailyQuantity: z.coerce.number().positive("Daily quantity must be a positive number"),
   startDate: z.coerce.date(),
-  price: z.coerce.number().positive("Price must be a positive number"),
 })
 
 export const subscribeProduct = async (req: Request, res: Response) => {
@@ -48,7 +47,6 @@ export const subscribeProduct = async (req: Request, res: Response) => {
       productId: req.body.productId || productId,
       dailyQuantity: req.body.dailyQuantity,
       startDate: req.body.startDate,
-      price: req.body.price,
     })
 
     if (!validateBody.success) {
@@ -59,7 +57,18 @@ export const subscribeProduct = async (req: Request, res: Response) => {
       })
     }
 
-    const { dailyQuantity, startDate, price } = validateBody.data
+    const { dailyQuantity, startDate } = validateBody.data
+
+    // Price is a product attribute set by the vendor — the customer no longer
+    // enters it. Snapshot the product's current price onto the subscription so
+    // later edits to the product price don't change this customer's revenue.
+    const price = parseFloat(product.price.toString()) || 0
+    if (price <= 0) {
+      return res.status(400).json({
+        message: "This product doesn't have a price set yet. Please ask the vendor to set a price before subscribing.",
+        success: false,
+      })
+    }
 
     // Normalize to local midnight so the seeded price row lines up with the
     // midday-anchored comparisons used when pricing revenue. `startDate` arrives
@@ -140,7 +149,7 @@ export const subscribeProduct = async (req: Request, res: Response) => {
     await sendNotification(
       vendorData.userId,
       `🎉 New Subscriber!`,
-      `${user.name} just subscribed to your product, ${product.productName} at price ${price}.`
+      `${user.name} just subscribed to your product, ${product.productName} at ₹${price} per unit.`
     );
 
 
