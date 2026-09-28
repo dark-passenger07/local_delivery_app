@@ -36,7 +36,28 @@ export const signupController = async (req: Request, res: Response) => {
 
     // console.log("Before check the users:")
 
-    // check for existing user
+    // -----------------------------------------------------------------------
+    // OTP VERIFICATION GUARD (SIGNUP)
+    // -----------------------------------------------------------------------
+    // Check if there is a verified OTP for this phone + purpose (SIGNUP)
+    // that hasn't been used (consumed) yet.
+    const verifiedOtp = await db.otpVerification.findFirst({
+      where: {
+        phone,
+        purpose: "SIGNUP",
+        isVerified: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!verifiedOtp) {
+      return res.status(403).json({
+        success: false,
+        message: "Phone number is not verified. Please verify OTP first.",
+      });
+    }
+
+    // Check for existing user
     const existingUser = await db.user.findUnique({
       where: { phone },
     });
@@ -60,6 +81,10 @@ export const signupController = async (req: Request, res: Response) => {
         address
       }
     })
+
+    // Consume the OTP so it can't be used again to register the same phone
+    // (though the DB unique constraint on phone prevents this anyway).
+    await db.otpVerification.delete({ where: { id: verifiedOtp.id } });
 
     if (!newUser) {
       return res.status(500).json({
@@ -121,6 +146,28 @@ export const loginController = async (req: Request, res: Response) => {
     }
 
     const { phone } = validateBody.data;
+
+    // -----------------------------------------------------------------------
+    // OTP VERIFICATION GUARD (LOGIN)
+    // -----------------------------------------------------------------------
+    // In demo mode we might want a backdoor for testing, but in production
+    // they MUST have a verified OTP to log in.
+    const verifiedOtp = await db.otpVerification.findFirst({
+      where: {
+        phone,
+        purpose: "LOGIN",
+        isVerified: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!verifiedOtp) {
+      return res.status(403).json({
+        success: false,
+        message: "Phone number is not verified. Please verify OTP first.",
+      });
+    }
+
     const user = await db.user.findUnique({ where: { phone } })
 
     if (!user) {
@@ -129,6 +176,10 @@ export const loginController = async (req: Request, res: Response) => {
         success: false,
       })
     }
+
+    // OTP consumed on successful login
+    await db.otpVerification.delete({ where: { id: verifiedOtp.id } });
+
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET as string, { expiresIn: '60d' });
 
     res.cookie("token", token, {

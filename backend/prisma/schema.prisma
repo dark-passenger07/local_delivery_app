@@ -59,6 +59,12 @@ enum SubscriptionStatus {
   STOPPED
 }
 
+enum OtpPurpose {
+  SIGNUP
+  LOGIN
+  CHANGE_PHONE
+}
+
 model User {
   id        String   @id @default(uuid())
   /// @zod.string.min(2, { message: "Name must be at least 2 characters long" })
@@ -264,4 +270,23 @@ model PushToken {
   userId    String
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Verification tokens for login, signup, and sensitive profile changes (e.g. changing phone number).
+model OtpVerification {
+  id         String     @id @default(uuid())
+  code       String
+  /// Phone number the OTP was sent to (might not yet be a User with this phone).
+  phone      String
+  /// Sign-up, reset credential, account access, change phone etc.
+  purpose    OtpPurpose
+  /// Becomes true once a subsequent user call provides the correct token.
+  isVerified Boolean    @default(false)
+
+  expiresAt  DateTime
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([phone, code])
+  @@index([phone, code])
 }

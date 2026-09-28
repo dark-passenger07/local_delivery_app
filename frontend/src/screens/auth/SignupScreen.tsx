@@ -20,7 +20,7 @@ export default function SignupScreen({ navigation }: any) {
   const [address, setAddress] = useState("");
   const [role, setRole] = useState<"CUSTOMER" | "VENDOR">("CUSTOMER");
   const [loading, setLoading] = useState(false);
-  const { signup } = useAuthStore()
+  const { signup, sendOtp } = useAuthStore()
 
 
   const handleSignup = async () => {
@@ -55,34 +55,33 @@ export default function SignupScreen({ navigation }: any) {
       return;
     }
 
-    // 4. API Submission
-    setLoading(false);
+    // 4. Send OTP first
     try {
       setLoading(true);
-      const res = await signup({
-        name: name.trim(),
-        phone: normalizedNumber,
-        role: role,
-        address: address.trim(),
+      await sendOtp(normalizedNumber, "SIGNUP");
+
+      Toast.show({
+        type: "info",
+        text1: "OTP Sent",
+        text2: "Please type the code we sent you.",
+        position: "top",
+        visibilityTime: 2000,
       });
 
-      if (res.success || res) {
-        Toast.show({
-          type: "success",
-          text1: "Account Created!",
-          position: "top",
-          visibilityTime: 2200,
-        });
-
-        // Navigate to Login after short delay
-        setTimeout(() => {
-          navigation.navigate("Login");
-        }, 1500);
-      }
+      navigation.navigate("OtpVerification", {
+        phone: normalizedNumber,
+        purpose: "SIGNUP",
+        signupData: {
+          name: name.trim(),
+          phone: normalizedNumber,
+          role: role,
+          address: address.trim(),
+        },
+      });
     } catch (error: any) {
       Toast.show({
         type: "error",
-        text1: "Could Not Create Account",
+        text1: "Could Not Send Code",
         text2: error.message || "Something went wrong. Please try again.",
         position: "top",
         visibilityTime: 3000,
@@ -192,7 +191,7 @@ export default function SignupScreen({ navigation }: any) {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.submitButtonText}>Create Account</Text>
+            <Text style={styles.submitButtonText}>Continue →</Text>
           )}
         </TouchableOpacity>
 

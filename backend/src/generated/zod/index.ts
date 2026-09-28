@@ -53,6 +53,8 @@ export const RequestsScalarFieldEnumSchema = z.enum(['id','vendorCustomerId','pr
 
 export const PushTokenScalarFieldEnumSchema = z.enum(['id','token','platform','userId','createdAt']);
 
+export const OtpVerificationScalarFieldEnumSchema = z.enum(['id','code','phone','purpose','isVerified','expiresAt','createdAt','updatedAt']);
+
 export const SortOrderSchema = z.enum(['asc','desc']);
 
 export const QueryModeSchema = z.enum(['default','insensitive']);
@@ -82,6 +84,10 @@ export type PlatformType = `${z.infer<typeof PlatformSchema>}`
 export const SubscriptionStatusSchema = z.enum(['ACTIVE','STOPPED']);
 
 export type SubscriptionStatusType = `${z.infer<typeof SubscriptionStatusSchema>}`
+
+export const OtpPurposeSchema = z.enum(['SIGNUP','LOGIN','CHANGE_PHONE']);
+
+export type OtpPurposeType = `${z.infer<typeof OtpPurposeSchema>}`
 
 /////////////////////////////////////////
 // MODELS
@@ -307,6 +313,35 @@ export const PushTokenSchema = z.object({
 })
 
 export type PushToken = z.infer<typeof PushTokenSchema>
+
+/////////////////////////////////////////
+// OTP VERIFICATION SCHEMA
+/////////////////////////////////////////
+
+/**
+ * Verification tokens for login, signup, and sensitive profile changes (e.g. changing phone number).
+ */
+export const OtpVerificationSchema = z.object({
+  /**
+   * Sign-up, reset credential, account access, change phone etc.
+   */
+  purpose: OtpPurposeSchema,
+  id: z.uuid(),
+  code: z.string(),
+  /**
+   * Phone number the OTP was sent to (might not yet be a User with this phone).
+   */
+  phone: z.string(),
+  /**
+   * Becomes true once a subsequent user call provides the correct token.
+   */
+  isVerified: z.boolean(),
+  expiresAt: z.coerce.date(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+})
+
+export type OtpVerification = z.infer<typeof OtpVerificationSchema>
 
 /////////////////////////////////////////
 // SELECT & INCLUDE
@@ -640,6 +675,20 @@ export const PushTokenSelectSchema: z.ZodType<Prisma.PushTokenSelect> = z.object
   userId: z.boolean().optional(),
   createdAt: z.boolean().optional(),
   user: z.union([z.boolean(),z.lazy(() => UserArgsSchema)]).optional(),
+}).strict()
+
+// OTP VERIFICATION
+//------------------------------------------------------
+
+export const OtpVerificationSelectSchema: z.ZodType<Prisma.OtpVerificationSelect> = z.object({
+  id: z.boolean().optional(),
+  code: z.boolean().optional(),
+  phone: z.boolean().optional(),
+  purpose: z.boolean().optional(),
+  isVerified: z.boolean().optional(),
+  expiresAt: z.boolean().optional(),
+  createdAt: z.boolean().optional(),
+  updatedAt: z.boolean().optional(),
 }).strict()
 
 
@@ -1489,6 +1538,86 @@ export const PushTokenScalarWhereWithAggregatesInputSchema: z.ZodType<Prisma.Pus
   createdAt: z.union([ z.lazy(() => DateTimeWithAggregatesFilterSchema), z.coerce.date() ]).optional(),
 });
 
+export const OtpVerificationWhereInputSchema: z.ZodType<Prisma.OtpVerificationWhereInput> = z.strictObject({
+  AND: z.union([ z.lazy(() => OtpVerificationWhereInputSchema), z.lazy(() => OtpVerificationWhereInputSchema).array() ]).optional(),
+  OR: z.lazy(() => OtpVerificationWhereInputSchema).array().optional(),
+  NOT: z.union([ z.lazy(() => OtpVerificationWhereInputSchema), z.lazy(() => OtpVerificationWhereInputSchema).array() ]).optional(),
+  id: z.union([ z.lazy(() => StringFilterSchema), z.string() ]).optional(),
+  code: z.union([ z.lazy(() => StringFilterSchema), z.string() ]).optional(),
+  phone: z.union([ z.lazy(() => StringFilterSchema), z.string() ]).optional(),
+  purpose: z.union([ z.lazy(() => EnumOtpPurposeFilterSchema), z.lazy(() => OtpPurposeSchema) ]).optional(),
+  isVerified: z.union([ z.lazy(() => BoolFilterSchema), z.boolean() ]).optional(),
+  expiresAt: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+  createdAt: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+  updatedAt: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+});
+
+export const OtpVerificationOrderByWithRelationInputSchema: z.ZodType<Prisma.OtpVerificationOrderByWithRelationInput> = z.strictObject({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  code: z.lazy(() => SortOrderSchema).optional(),
+  phone: z.lazy(() => SortOrderSchema).optional(),
+  purpose: z.lazy(() => SortOrderSchema).optional(),
+  isVerified: z.lazy(() => SortOrderSchema).optional(),
+  expiresAt: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional(),
+  updatedAt: z.lazy(() => SortOrderSchema).optional(),
+});
+
+export const OtpVerificationWhereUniqueInputSchema: z.ZodType<Prisma.OtpVerificationWhereUniqueInput> = z.union([
+  z.object({
+    id: z.uuid(),
+    phone_code: z.lazy(() => OtpVerificationPhoneCodeCompoundUniqueInputSchema),
+  }),
+  z.object({
+    id: z.uuid(),
+  }),
+  z.object({
+    phone_code: z.lazy(() => OtpVerificationPhoneCodeCompoundUniqueInputSchema),
+  }),
+])
+.and(z.strictObject({
+  id: z.uuid().optional(),
+  phone_code: z.lazy(() => OtpVerificationPhoneCodeCompoundUniqueInputSchema).optional(),
+  AND: z.union([ z.lazy(() => OtpVerificationWhereInputSchema), z.lazy(() => OtpVerificationWhereInputSchema).array() ]).optional(),
+  OR: z.lazy(() => OtpVerificationWhereInputSchema).array().optional(),
+  NOT: z.union([ z.lazy(() => OtpVerificationWhereInputSchema), z.lazy(() => OtpVerificationWhereInputSchema).array() ]).optional(),
+  code: z.union([ z.lazy(() => StringFilterSchema), z.string() ]).optional(),
+  phone: z.union([ z.lazy(() => StringFilterSchema), z.string() ]).optional(),
+  purpose: z.union([ z.lazy(() => EnumOtpPurposeFilterSchema), z.lazy(() => OtpPurposeSchema) ]).optional(),
+  isVerified: z.union([ z.lazy(() => BoolFilterSchema), z.boolean() ]).optional(),
+  expiresAt: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+  createdAt: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+  updatedAt: z.union([ z.lazy(() => DateTimeFilterSchema), z.coerce.date() ]).optional(),
+}));
+
+export const OtpVerificationOrderByWithAggregationInputSchema: z.ZodType<Prisma.OtpVerificationOrderByWithAggregationInput> = z.strictObject({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  code: z.lazy(() => SortOrderSchema).optional(),
+  phone: z.lazy(() => SortOrderSchema).optional(),
+  purpose: z.lazy(() => SortOrderSchema).optional(),
+  isVerified: z.lazy(() => SortOrderSchema).optional(),
+  expiresAt: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional(),
+  updatedAt: z.lazy(() => SortOrderSchema).optional(),
+  _count: z.lazy(() => OtpVerificationCountOrderByAggregateInputSchema).optional(),
+  _max: z.lazy(() => OtpVerificationMaxOrderByAggregateInputSchema).optional(),
+  _min: z.lazy(() => OtpVerificationMinOrderByAggregateInputSchema).optional(),
+});
+
+export const OtpVerificationScalarWhereWithAggregatesInputSchema: z.ZodType<Prisma.OtpVerificationScalarWhereWithAggregatesInput> = z.strictObject({
+  AND: z.union([ z.lazy(() => OtpVerificationScalarWhereWithAggregatesInputSchema), z.lazy(() => OtpVerificationScalarWhereWithAggregatesInputSchema).array() ]).optional(),
+  OR: z.lazy(() => OtpVerificationScalarWhereWithAggregatesInputSchema).array().optional(),
+  NOT: z.union([ z.lazy(() => OtpVerificationScalarWhereWithAggregatesInputSchema), z.lazy(() => OtpVerificationScalarWhereWithAggregatesInputSchema).array() ]).optional(),
+  id: z.union([ z.lazy(() => StringWithAggregatesFilterSchema), z.string() ]).optional(),
+  code: z.union([ z.lazy(() => StringWithAggregatesFilterSchema), z.string() ]).optional(),
+  phone: z.union([ z.lazy(() => StringWithAggregatesFilterSchema), z.string() ]).optional(),
+  purpose: z.union([ z.lazy(() => EnumOtpPurposeWithAggregatesFilterSchema), z.lazy(() => OtpPurposeSchema) ]).optional(),
+  isVerified: z.union([ z.lazy(() => BoolWithAggregatesFilterSchema), z.boolean() ]).optional(),
+  expiresAt: z.union([ z.lazy(() => DateTimeWithAggregatesFilterSchema), z.coerce.date() ]).optional(),
+  createdAt: z.union([ z.lazy(() => DateTimeWithAggregatesFilterSchema), z.coerce.date() ]).optional(),
+  updatedAt: z.union([ z.lazy(() => DateTimeWithAggregatesFilterSchema), z.coerce.date() ]).optional(),
+});
+
 export const UserCreateInputSchema: z.ZodType<Prisma.UserCreateInput> = z.strictObject({
   id: z.uuid().optional(),
   name: z.string().min(2, { message: "Name must be at least 2 characters long" }),
@@ -2305,6 +2434,83 @@ export const PushTokenUncheckedUpdateManyInputSchema: z.ZodType<Prisma.PushToken
   createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
 });
 
+export const OtpVerificationCreateInputSchema: z.ZodType<Prisma.OtpVerificationCreateInput> = z.strictObject({
+  id: z.uuid().optional(),
+  code: z.string(),
+  phone: z.string(),
+  purpose: z.lazy(() => OtpPurposeSchema),
+  isVerified: z.boolean().optional(),
+  expiresAt: z.coerce.date(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+});
+
+export const OtpVerificationUncheckedCreateInputSchema: z.ZodType<Prisma.OtpVerificationUncheckedCreateInput> = z.strictObject({
+  id: z.uuid().optional(),
+  code: z.string(),
+  phone: z.string(),
+  purpose: z.lazy(() => OtpPurposeSchema),
+  isVerified: z.boolean().optional(),
+  expiresAt: z.coerce.date(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+});
+
+export const OtpVerificationUpdateInputSchema: z.ZodType<Prisma.OtpVerificationUpdateInput> = z.strictObject({
+  id: z.union([ z.uuid(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  code: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  phone: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  purpose: z.union([ z.lazy(() => OtpPurposeSchema), z.lazy(() => EnumOtpPurposeFieldUpdateOperationsInputSchema) ]).optional(),
+  isVerified: z.union([ z.boolean(),z.lazy(() => BoolFieldUpdateOperationsInputSchema) ]).optional(),
+  expiresAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+});
+
+export const OtpVerificationUncheckedUpdateInputSchema: z.ZodType<Prisma.OtpVerificationUncheckedUpdateInput> = z.strictObject({
+  id: z.union([ z.uuid(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  code: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  phone: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  purpose: z.union([ z.lazy(() => OtpPurposeSchema), z.lazy(() => EnumOtpPurposeFieldUpdateOperationsInputSchema) ]).optional(),
+  isVerified: z.union([ z.boolean(),z.lazy(() => BoolFieldUpdateOperationsInputSchema) ]).optional(),
+  expiresAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+});
+
+export const OtpVerificationCreateManyInputSchema: z.ZodType<Prisma.OtpVerificationCreateManyInput> = z.strictObject({
+  id: z.uuid().optional(),
+  code: z.string(),
+  phone: z.string(),
+  purpose: z.lazy(() => OtpPurposeSchema),
+  isVerified: z.boolean().optional(),
+  expiresAt: z.coerce.date(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+});
+
+export const OtpVerificationUpdateManyMutationInputSchema: z.ZodType<Prisma.OtpVerificationUpdateManyMutationInput> = z.strictObject({
+  id: z.union([ z.uuid(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  code: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  phone: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  purpose: z.union([ z.lazy(() => OtpPurposeSchema), z.lazy(() => EnumOtpPurposeFieldUpdateOperationsInputSchema) ]).optional(),
+  isVerified: z.union([ z.boolean(),z.lazy(() => BoolFieldUpdateOperationsInputSchema) ]).optional(),
+  expiresAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+});
+
+export const OtpVerificationUncheckedUpdateManyInputSchema: z.ZodType<Prisma.OtpVerificationUncheckedUpdateManyInput> = z.strictObject({
+  id: z.union([ z.uuid(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  code: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  phone: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  purpose: z.union([ z.lazy(() => OtpPurposeSchema), z.lazy(() => EnumOtpPurposeFieldUpdateOperationsInputSchema) ]).optional(),
+  isVerified: z.union([ z.boolean(),z.lazy(() => BoolFieldUpdateOperationsInputSchema) ]).optional(),
+  expiresAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+});
+
 export const StringFilterSchema: z.ZodType<Prisma.StringFilter> = z.strictObject({
   equals: z.string().optional(),
   in: z.string().array().optional(),
@@ -3114,6 +3320,74 @@ export const EnumPlatformWithAggregatesFilterSchema: z.ZodType<Prisma.EnumPlatfo
   _max: z.lazy(() => NestedEnumPlatformFilterSchema).optional(),
 });
 
+export const EnumOtpPurposeFilterSchema: z.ZodType<Prisma.EnumOtpPurposeFilter> = z.strictObject({
+  equals: z.lazy(() => OtpPurposeSchema).optional(),
+  in: z.lazy(() => OtpPurposeSchema).array().optional(),
+  notIn: z.lazy(() => OtpPurposeSchema).array().optional(),
+  not: z.union([ z.lazy(() => OtpPurposeSchema), z.lazy(() => NestedEnumOtpPurposeFilterSchema) ]).optional(),
+});
+
+export const BoolFilterSchema: z.ZodType<Prisma.BoolFilter> = z.strictObject({
+  equals: z.boolean().optional(),
+  not: z.union([ z.boolean(),z.lazy(() => NestedBoolFilterSchema) ]).optional(),
+});
+
+export const OtpVerificationPhoneCodeCompoundUniqueInputSchema: z.ZodType<Prisma.OtpVerificationPhoneCodeCompoundUniqueInput> = z.strictObject({
+  phone: z.string(),
+  code: z.string(),
+});
+
+export const OtpVerificationCountOrderByAggregateInputSchema: z.ZodType<Prisma.OtpVerificationCountOrderByAggregateInput> = z.strictObject({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  code: z.lazy(() => SortOrderSchema).optional(),
+  phone: z.lazy(() => SortOrderSchema).optional(),
+  purpose: z.lazy(() => SortOrderSchema).optional(),
+  isVerified: z.lazy(() => SortOrderSchema).optional(),
+  expiresAt: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional(),
+  updatedAt: z.lazy(() => SortOrderSchema).optional(),
+});
+
+export const OtpVerificationMaxOrderByAggregateInputSchema: z.ZodType<Prisma.OtpVerificationMaxOrderByAggregateInput> = z.strictObject({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  code: z.lazy(() => SortOrderSchema).optional(),
+  phone: z.lazy(() => SortOrderSchema).optional(),
+  purpose: z.lazy(() => SortOrderSchema).optional(),
+  isVerified: z.lazy(() => SortOrderSchema).optional(),
+  expiresAt: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional(),
+  updatedAt: z.lazy(() => SortOrderSchema).optional(),
+});
+
+export const OtpVerificationMinOrderByAggregateInputSchema: z.ZodType<Prisma.OtpVerificationMinOrderByAggregateInput> = z.strictObject({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  code: z.lazy(() => SortOrderSchema).optional(),
+  phone: z.lazy(() => SortOrderSchema).optional(),
+  purpose: z.lazy(() => SortOrderSchema).optional(),
+  isVerified: z.lazy(() => SortOrderSchema).optional(),
+  expiresAt: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional(),
+  updatedAt: z.lazy(() => SortOrderSchema).optional(),
+});
+
+export const EnumOtpPurposeWithAggregatesFilterSchema: z.ZodType<Prisma.EnumOtpPurposeWithAggregatesFilter> = z.strictObject({
+  equals: z.lazy(() => OtpPurposeSchema).optional(),
+  in: z.lazy(() => OtpPurposeSchema).array().optional(),
+  notIn: z.lazy(() => OtpPurposeSchema).array().optional(),
+  not: z.union([ z.lazy(() => OtpPurposeSchema), z.lazy(() => NestedEnumOtpPurposeWithAggregatesFilterSchema) ]).optional(),
+  _count: z.lazy(() => NestedIntFilterSchema).optional(),
+  _min: z.lazy(() => NestedEnumOtpPurposeFilterSchema).optional(),
+  _max: z.lazy(() => NestedEnumOtpPurposeFilterSchema).optional(),
+});
+
+export const BoolWithAggregatesFilterSchema: z.ZodType<Prisma.BoolWithAggregatesFilter> = z.strictObject({
+  equals: z.boolean().optional(),
+  not: z.union([ z.boolean(),z.lazy(() => NestedBoolWithAggregatesFilterSchema) ]).optional(),
+  _count: z.lazy(() => NestedIntFilterSchema).optional(),
+  _min: z.lazy(() => NestedBoolFilterSchema).optional(),
+  _max: z.lazy(() => NestedBoolFilterSchema).optional(),
+});
+
 export const VendorCreateNestedOneWithoutUserInputSchema: z.ZodType<Prisma.VendorCreateNestedOneWithoutUserInput> = z.strictObject({
   create: z.union([ z.lazy(() => VendorCreateWithoutUserInputSchema), z.lazy(() => VendorUncheckedCreateWithoutUserInputSchema) ]).optional(),
   connectOrCreate: z.lazy(() => VendorCreateOrConnectWithoutUserInputSchema).optional(),
@@ -3896,6 +4170,14 @@ export const UserUpdateOneRequiredWithoutPushTokenNestedInputSchema: z.ZodType<P
   update: z.union([ z.lazy(() => UserUpdateToOneWithWhereWithoutPushTokenInputSchema), z.lazy(() => UserUpdateWithoutPushTokenInputSchema), z.lazy(() => UserUncheckedUpdateWithoutPushTokenInputSchema) ]).optional(),
 });
 
+export const EnumOtpPurposeFieldUpdateOperationsInputSchema: z.ZodType<Prisma.EnumOtpPurposeFieldUpdateOperationsInput> = z.strictObject({
+  set: z.lazy(() => OtpPurposeSchema).optional(),
+});
+
+export const BoolFieldUpdateOperationsInputSchema: z.ZodType<Prisma.BoolFieldUpdateOperationsInput> = z.strictObject({
+  set: z.boolean().optional(),
+});
+
 export const NestedStringFilterSchema: z.ZodType<Prisma.NestedStringFilter> = z.strictObject({
   equals: z.string().optional(),
   in: z.string().array().optional(),
@@ -4211,6 +4493,36 @@ export const NestedEnumPlatformWithAggregatesFilterSchema: z.ZodType<Prisma.Nest
   _count: z.lazy(() => NestedIntFilterSchema).optional(),
   _min: z.lazy(() => NestedEnumPlatformFilterSchema).optional(),
   _max: z.lazy(() => NestedEnumPlatformFilterSchema).optional(),
+});
+
+export const NestedEnumOtpPurposeFilterSchema: z.ZodType<Prisma.NestedEnumOtpPurposeFilter> = z.strictObject({
+  equals: z.lazy(() => OtpPurposeSchema).optional(),
+  in: z.lazy(() => OtpPurposeSchema).array().optional(),
+  notIn: z.lazy(() => OtpPurposeSchema).array().optional(),
+  not: z.union([ z.lazy(() => OtpPurposeSchema), z.lazy(() => NestedEnumOtpPurposeFilterSchema) ]).optional(),
+});
+
+export const NestedBoolFilterSchema: z.ZodType<Prisma.NestedBoolFilter> = z.strictObject({
+  equals: z.boolean().optional(),
+  not: z.union([ z.boolean(),z.lazy(() => NestedBoolFilterSchema) ]).optional(),
+});
+
+export const NestedEnumOtpPurposeWithAggregatesFilterSchema: z.ZodType<Prisma.NestedEnumOtpPurposeWithAggregatesFilter> = z.strictObject({
+  equals: z.lazy(() => OtpPurposeSchema).optional(),
+  in: z.lazy(() => OtpPurposeSchema).array().optional(),
+  notIn: z.lazy(() => OtpPurposeSchema).array().optional(),
+  not: z.union([ z.lazy(() => OtpPurposeSchema), z.lazy(() => NestedEnumOtpPurposeWithAggregatesFilterSchema) ]).optional(),
+  _count: z.lazy(() => NestedIntFilterSchema).optional(),
+  _min: z.lazy(() => NestedEnumOtpPurposeFilterSchema).optional(),
+  _max: z.lazy(() => NestedEnumOtpPurposeFilterSchema).optional(),
+});
+
+export const NestedBoolWithAggregatesFilterSchema: z.ZodType<Prisma.NestedBoolWithAggregatesFilter> = z.strictObject({
+  equals: z.boolean().optional(),
+  not: z.union([ z.boolean(),z.lazy(() => NestedBoolWithAggregatesFilterSchema) ]).optional(),
+  _count: z.lazy(() => NestedIntFilterSchema).optional(),
+  _min: z.lazy(() => NestedBoolFilterSchema).optional(),
+  _max: z.lazy(() => NestedBoolFilterSchema).optional(),
 });
 
 export const VendorCreateWithoutUserInputSchema: z.ZodType<Prisma.VendorCreateWithoutUserInput> = z.strictObject({
@@ -7030,6 +7342,63 @@ export const PushTokenFindUniqueOrThrowArgsSchema: z.ZodType<Prisma.PushTokenFin
   where: PushTokenWhereUniqueInputSchema, 
 }).strict();
 
+export const OtpVerificationFindFirstArgsSchema: z.ZodType<Prisma.OtpVerificationFindFirstArgs> = z.object({
+  select: OtpVerificationSelectSchema.optional(),
+  where: OtpVerificationWhereInputSchema.optional(), 
+  orderBy: z.union([ OtpVerificationOrderByWithRelationInputSchema.array(), OtpVerificationOrderByWithRelationInputSchema ]).optional(),
+  cursor: OtpVerificationWhereUniqueInputSchema.optional(), 
+  take: z.number().optional(),
+  skip: z.number().optional(),
+  distinct: z.union([ OtpVerificationScalarFieldEnumSchema, OtpVerificationScalarFieldEnumSchema.array() ]).optional(),
+}).strict();
+
+export const OtpVerificationFindFirstOrThrowArgsSchema: z.ZodType<Prisma.OtpVerificationFindFirstOrThrowArgs> = z.object({
+  select: OtpVerificationSelectSchema.optional(),
+  where: OtpVerificationWhereInputSchema.optional(), 
+  orderBy: z.union([ OtpVerificationOrderByWithRelationInputSchema.array(), OtpVerificationOrderByWithRelationInputSchema ]).optional(),
+  cursor: OtpVerificationWhereUniqueInputSchema.optional(), 
+  take: z.number().optional(),
+  skip: z.number().optional(),
+  distinct: z.union([ OtpVerificationScalarFieldEnumSchema, OtpVerificationScalarFieldEnumSchema.array() ]).optional(),
+}).strict();
+
+export const OtpVerificationFindManyArgsSchema: z.ZodType<Prisma.OtpVerificationFindManyArgs> = z.object({
+  select: OtpVerificationSelectSchema.optional(),
+  where: OtpVerificationWhereInputSchema.optional(), 
+  orderBy: z.union([ OtpVerificationOrderByWithRelationInputSchema.array(), OtpVerificationOrderByWithRelationInputSchema ]).optional(),
+  cursor: OtpVerificationWhereUniqueInputSchema.optional(), 
+  take: z.number().optional(),
+  skip: z.number().optional(),
+  distinct: z.union([ OtpVerificationScalarFieldEnumSchema, OtpVerificationScalarFieldEnumSchema.array() ]).optional(),
+}).strict();
+
+export const OtpVerificationAggregateArgsSchema: z.ZodType<Prisma.OtpVerificationAggregateArgs> = z.object({
+  where: OtpVerificationWhereInputSchema.optional(), 
+  orderBy: z.union([ OtpVerificationOrderByWithRelationInputSchema.array(), OtpVerificationOrderByWithRelationInputSchema ]).optional(),
+  cursor: OtpVerificationWhereUniqueInputSchema.optional(), 
+  take: z.number().optional(),
+  skip: z.number().optional(),
+}).strict();
+
+export const OtpVerificationGroupByArgsSchema: z.ZodType<Prisma.OtpVerificationGroupByArgs> = z.object({
+  where: OtpVerificationWhereInputSchema.optional(), 
+  orderBy: z.union([ OtpVerificationOrderByWithAggregationInputSchema.array(), OtpVerificationOrderByWithAggregationInputSchema ]).optional(),
+  by: OtpVerificationScalarFieldEnumSchema.array(), 
+  having: OtpVerificationScalarWhereWithAggregatesInputSchema.optional(), 
+  take: z.number().optional(),
+  skip: z.number().optional(),
+}).strict();
+
+export const OtpVerificationFindUniqueArgsSchema: z.ZodType<Prisma.OtpVerificationFindUniqueArgs> = z.object({
+  select: OtpVerificationSelectSchema.optional(),
+  where: OtpVerificationWhereUniqueInputSchema, 
+}).strict();
+
+export const OtpVerificationFindUniqueOrThrowArgsSchema: z.ZodType<Prisma.OtpVerificationFindUniqueOrThrowArgs> = z.object({
+  select: OtpVerificationSelectSchema.optional(),
+  where: OtpVerificationWhereUniqueInputSchema, 
+}).strict();
+
 export const UserCreateArgsSchema: z.ZodType<Prisma.UserCreateArgs> = z.object({
   select: UserSelectSchema.optional(),
   include: UserIncludeSchema.optional(),
@@ -7567,5 +7936,55 @@ export const PushTokenUpdateManyAndReturnArgsSchema: z.ZodType<Prisma.PushTokenU
 
 export const PushTokenDeleteManyArgsSchema: z.ZodType<Prisma.PushTokenDeleteManyArgs> = z.object({
   where: PushTokenWhereInputSchema.optional(), 
+  limit: z.number().optional(),
+}).strict();
+
+export const OtpVerificationCreateArgsSchema: z.ZodType<Prisma.OtpVerificationCreateArgs> = z.object({
+  select: OtpVerificationSelectSchema.optional(),
+  data: z.union([ OtpVerificationCreateInputSchema, OtpVerificationUncheckedCreateInputSchema ]),
+}).strict();
+
+export const OtpVerificationUpsertArgsSchema: z.ZodType<Prisma.OtpVerificationUpsertArgs> = z.object({
+  select: OtpVerificationSelectSchema.optional(),
+  where: OtpVerificationWhereUniqueInputSchema, 
+  create: z.union([ OtpVerificationCreateInputSchema, OtpVerificationUncheckedCreateInputSchema ]),
+  update: z.union([ OtpVerificationUpdateInputSchema, OtpVerificationUncheckedUpdateInputSchema ]),
+}).strict();
+
+export const OtpVerificationCreateManyArgsSchema: z.ZodType<Prisma.OtpVerificationCreateManyArgs> = z.object({
+  data: z.union([ OtpVerificationCreateManyInputSchema, OtpVerificationCreateManyInputSchema.array() ]),
+  skipDuplicates: z.boolean().optional(),
+}).strict();
+
+export const OtpVerificationCreateManyAndReturnArgsSchema: z.ZodType<Prisma.OtpVerificationCreateManyAndReturnArgs> = z.object({
+  data: z.union([ OtpVerificationCreateManyInputSchema, OtpVerificationCreateManyInputSchema.array() ]),
+  skipDuplicates: z.boolean().optional(),
+}).strict();
+
+export const OtpVerificationDeleteArgsSchema: z.ZodType<Prisma.OtpVerificationDeleteArgs> = z.object({
+  select: OtpVerificationSelectSchema.optional(),
+  where: OtpVerificationWhereUniqueInputSchema, 
+}).strict();
+
+export const OtpVerificationUpdateArgsSchema: z.ZodType<Prisma.OtpVerificationUpdateArgs> = z.object({
+  select: OtpVerificationSelectSchema.optional(),
+  data: z.union([ OtpVerificationUpdateInputSchema, OtpVerificationUncheckedUpdateInputSchema ]),
+  where: OtpVerificationWhereUniqueInputSchema, 
+}).strict();
+
+export const OtpVerificationUpdateManyArgsSchema: z.ZodType<Prisma.OtpVerificationUpdateManyArgs> = z.object({
+  data: z.union([ OtpVerificationUpdateManyMutationInputSchema, OtpVerificationUncheckedUpdateManyInputSchema ]),
+  where: OtpVerificationWhereInputSchema.optional(), 
+  limit: z.number().optional(),
+}).strict();
+
+export const OtpVerificationUpdateManyAndReturnArgsSchema: z.ZodType<Prisma.OtpVerificationUpdateManyAndReturnArgs> = z.object({
+  data: z.union([ OtpVerificationUpdateManyMutationInputSchema, OtpVerificationUncheckedUpdateManyInputSchema ]),
+  where: OtpVerificationWhereInputSchema.optional(), 
+  limit: z.number().optional(),
+}).strict();
+
+export const OtpVerificationDeleteManyArgsSchema: z.ZodType<Prisma.OtpVerificationDeleteManyArgs> = z.object({
+  where: OtpVerificationWhereInputSchema.optional(), 
   limit: z.number().optional(),
 }).strict();

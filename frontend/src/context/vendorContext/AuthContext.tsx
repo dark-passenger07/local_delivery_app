@@ -24,6 +24,9 @@ export type UpdateProfileTypes = {
   name?: string,
   address?: string
 }
+
+export type OtpPurpose = "SIGNUP" | "LOGIN" | "CHANGE_PHONE"
+
 export enum RoleTypes {
   VENDOR = "VENDOR",
   CUSTOMER = "CUSTOMER"
@@ -51,6 +54,9 @@ interface AuthState {
   signup: (credentials: SignupTypes) => Promise<any>
   updateProfile: (data: UpdateProfileTypes) => Promise<any>
   logout: () => Promise<any>
+  sendOtp: (phone: string, purpose: OtpPurpose) => Promise<any>
+  verifyOtp: (phone: string, code: string, purpose: OtpPurpose) => Promise<any>
+  resendOtp: (phone: string, purpose: OtpPurpose) => Promise<any>
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -154,6 +160,39 @@ export const useAuthStore = create<AuthState>()(
           useVendorContextStore.getState().resetVendorProfile()
           useSocketStore.getState().disconnectSocket()
           set({ user: null });
+        }
+      },
+
+      sendOtp: async (phone: string, purpose: OtpPurpose) => {
+        try {
+          console.log("-------------------------")
+          console.log("Phone: ", phone, "purpose: ",purpose);
+          // Send OTP is an unauthenticated gateway endpoint
+          const res = await axiosInstance.post("/otp/send", { phone, purpose });
+          return res.data;
+        } catch (error: any) {
+          const message = error?.response?.data?.message ?? error.message ?? "Failed to send OTP.";
+          throw new Error(message);
+        }
+      },
+
+      verifyOtp: async (phone: string, code: string, purpose: OtpPurpose) => {
+        try {
+          const res = await axiosInstance.post("/otp/verify", { phone, code, purpose });
+          return res.data;
+        } catch (error: any) {
+          const message = error?.response?.data?.message ?? error.message ?? "OTP Verification failed.";
+          throw new Error(message);
+        }
+      },
+
+      resendOtp: async (phone: string, purpose: OtpPurpose) => {
+        try {
+          const res = await axiosInstance.post("/otp/resend", { phone, purpose });
+          return res.data;
+        } catch (error: any) {
+          const message = error?.response?.data?.message ?? error.message ?? "Failed to resend OTP.";
+          throw new Error(message);
         }
       }
     }),
