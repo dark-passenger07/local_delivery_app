@@ -47,7 +47,9 @@ export default function HomeScreen() {
     getCustomerSubscribedProducts,
     customerRequest,
     unsubcribeProduct,
-    subcribedProducts
+    subcribedProducts,
+    requestDetails,
+    getAllRequestCustomer
   } = useCustomerHomeContext();
 
   // Component UI States
@@ -73,13 +75,17 @@ export default function HomeScreen() {
   const [showPicker, setShowPicker] = useState<boolean>(false);
   const [pickerMode, setPickerMode] = useState<"start" | "end">("start");
 
-  // Fetch products on mount
+  // Fetch products + existing requests on mount (requests are needed to
+  // lock dates covered by a pending/accepted SKIP request)
   useEffect(() => {
     addPendingNotification();
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        await getCustomerSubscribedProducts();
+        await Promise.all([
+          getCustomerSubscribedProducts(),
+          getAllRequestCustomer().catch(() => {}),
+        ]);
       } catch (error: any) {
         Alert.alert("Error", error.message || "Failed to load products");
       } finally {
@@ -154,6 +160,8 @@ export default function HomeScreen() {
       Alert.alert("Requests Disabled", "Requests are currently disabled. Please try again after 12 PM.");
       return;
     }
+    // Refresh latest requests so SKIP-locked days are up to date on open.
+    getAllRequestCustomer().catch(() => {});
     setSelectedProductId(productId);
     setSelectedProductName(productName);
     setSelectedProductUnit(unit);
@@ -190,6 +198,26 @@ export default function HomeScreen() {
         Alert.alert("That Date Has Passed", "Please choose today or a date in the future.");
         return;
       }
+      // If the picked start day itself falls inside a locked SKIP range,
+      // stop immediately — no request is allowed on those days.
+      const lockedForStart = (requestDetails || []).filter((req: any) => {
+        const sameProduct = req.productId === selectedProductId || req.product?.id === selectedProductId;
+        const status = req.status?.toUpperCase();
+        if (!(sameProduct && req.type === "SKIP" && (status === "PENDING" || status === "ACCEPTED"))) return false;
+        const rs = new Date(req.start_date); rs.setHours(0, 0, 0, 0);
+        const re = new Date(req.end_date); re.setHours(23, 59, 59, 999);
+        return normalizedDate >= rs && normalizedDate <= re;
+      });
+      if (lockedForStart.length > 0) {
+        const status = lockedForStart[0].status?.toUpperCase();
+        Alert.alert(
+          status === "PENDING" ? "Dates Locked" : "Already Skipped",
+          status === "PENDING"
+            ? "This day is part of a pending skip request. You can't make another request on it until the vendor rejects the skip."
+            : "This day is already skipped. You can't make another request on it."
+        );
+        return;
+      }
       setStartDateObj(normalizedDate);
 
       if (endDateObj && normalizedDate > endDateObj) {
@@ -202,6 +230,24 @@ export default function HomeScreen() {
       }
       if (normalizedDate < startDateObj) {
         Alert.alert("Date Problem", "End Date cannot be before Start Date.");
+        return;
+      }
+      // The full [start, end] range must not touch a locked SKIP range.
+      const overlapsLocked = (requestDetails || []).some((req: any) => {
+        const sameProduct = req.productId === selectedProductId || req.product?.id === selectedProductId;
+        const status = req.status?.toUpperCase();
+        if (!(sameProduct && req.type === "SKIP" && (status === "PENDING" || status === "ACCEPTED"))) return false;
+        const rs = new Date(req.start_date); rs.setHours(0, 0, 0, 0);
+        const re = new Date(req.end_date); re.setHours(0, 0, 0, 0);
+        const s = new Date(startDateObj); s.setHours(0, 0, 0, 0);
+        const e = new Date(normalizedDate); e.setHours(0, 0, 0, 0);
+        return s <= re && e >= rs;
+      });
+      if (overlapsLocked) {
+        Alert.alert(
+          "Dates Locked",
+          "This range overlaps days locked by a skip request. You can't make another request on those days until the vendor rejects the skip."
+        );
         return;
       }
       setEndDateObj(normalizedDate);
@@ -217,13 +263,51 @@ export default function HomeScreen() {
     setShowPicker(false);
   };
 
-  // Pick a preset request type
+  // Pick a preset request type. Whenever the type changes, the previously
+  // picked Start/End dates are cleared so a SKIP range can't leak into an
+  // INCREASE/DECREASE request (and vice versa) — the user must re-pick dates.
   const handleSelectRequestType = (key: string, label: string) => {
+    if (key !== requestTypeKey) {
+      setStartDateObj(null);
+      setEndDateObj(null);
+    }
     setRequestTypeKey(key);
     setRequestType(label);
     if (key !== "INCREASE" && key !== "DECREASE") {
       setRequestedQuantity("");
     }
+  };
+
+  // Dates locked by a PENDING or ACCEPTED SKIP request for the currently
+  // selected product. New requests on these days are blocked until the SKIP
+  // is REJECTED by the vendor.
+  const getLockedSkipRanges = () => {
+    if (!selectedProductId) return [];
+    return (requestDetails || []).filter((req: any) => {
+      const sameProduct =
+        req.productId === selectedProductId ||
+        req.product?.id === selectedProductId;
+      const isSkip = req.type === "SKIP";
+      const status = req.status?.toUpperCase();
+      const isLocked = status === "PENDING" || status === "ACCEPTED";
+      return sameProduct && isSkip && isLocked && req.start_date && req.end_date;
+    });
+  };
+
+  const formatShortDate = (dateString: string): string => {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return dateString;
+    return formatDateString(d);
+  };
+
+  const findOverlappingSkip = (start: Date, end: Date) => {
+    const s = new Date(start); s.setHours(0, 0, 0, 0);
+    const e = new Date(end); e.setHours(0, 0, 0, 0);
+    return getLockedSkipRanges().find((req: any) => {
+      const rs = new Date(req.start_date); rs.setHours(0, 0, 0, 0);
+      const re = new Date(req.end_date); re.setHours(0, 0, 0, 0);
+      return s <= re && e >= rs;
+    });
   };
 
   // Submit form data out to your API engine
@@ -242,6 +326,20 @@ export default function HomeScreen() {
     }
     if (!selectedProductId) {
       Alert.alert("Missing Info", "Please select a product first.");
+      return;
+    }
+    // Block any request (SKIP / INCREASE / DECREASE) on days locked by a
+    // pending or accepted SKIP request, until the vendor rejects it.
+    const overlappingSkip: any = findOverlappingSkip(startDateObj, endDateObj);
+    if (overlappingSkip) {
+      const status = overlappingSkip.status?.toUpperCase();
+      const range = `${formatShortDate(overlappingSkip.start_date)} - ${formatShortDate(overlappingSkip.end_date)}`;
+      Alert.alert(
+        status === "PENDING" ? "Dates Locked" : "Already Skipped",
+        status === "PENDING"
+          ? `You already have a pending skip request (${range}). You can't make another request on those days until the vendor rejects it.`
+          : `These days are already skipped (${range}). You can't make another request on skipped days.`
+      );
       return;
     }
     if ((requestTypeKey === "INCREASE" || requestTypeKey === "DECREASE") && !requestedQuantity.trim()) {

@@ -46,7 +46,7 @@ const ProductScreen = () => {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [subscribing, setSubscribing] = useState<boolean>(false);
   const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set());
-  const [dailyQuantity, setDailyQuantity] = useState('1');
+  const [dailyQuantity, setDailyQuantity] = useState('0');
   const [startDate, setStartDate] = useState('');
   const [startDateObj, setStartDateObj] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -110,16 +110,22 @@ const ProductScreen = () => {
     setShowDatePicker(true);
   };
 
+  const getTomorrow = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    return tomorrow;
+  };
+
   const onDateChange = (_event: DateTimePickerChangeEvent, selectedDate: Date) => {
     if (Platform.OS !== 'ios') {
       setShowDatePicker(false);
     }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const tomorrow = getTomorrow();
     const chosenDate = new Date(selectedDate);
     chosenDate.setHours(0, 0, 0, 0);
-    if (chosenDate < today) {
-      Alert.alert('Invalid Date', 'Please choose today or a future date.');
+    if (chosenDate < tomorrow) {
+      Alert.alert('Invalid Date', 'Subscriptions cannot start today. Please choose tomorrow or a future date.');
       return;
     }
     setStartDateObj(chosenDate);
@@ -131,6 +137,7 @@ const ProductScreen = () => {
 
   const initiateSubscriptionFlow = (productId: string) => {
     setSelectedProductId(productId);
+    setDailyQuantity('0');
     setStartDate('');
     setStartDateObj(null);
     setShowDatePicker(false);
@@ -372,10 +379,10 @@ const ProductScreen = () => {
 
             {showDatePicker && (
               <DateTimePicker
-                value={startDateObj || new Date()}
+                value={startDateObj || getTomorrow()}
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                minimumDate={new Date()}
+                minimumDate={getTomorrow()}
                 onValueChange={onDateChange}
               />
             )}

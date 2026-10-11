@@ -128,6 +128,9 @@ export const useCustomerHomeContext = create<CustomerHomeState>()((set, get) => 
       if (res.data.success) {
         await get().getCustomerSubscribedProducts()
         await useCustomerSubscriptionStore.getState().fetchMySubscriptions()
+        // pending requests for this product were auto-rejected on the server —
+        // refresh so they show as Rejected instead of stuck on Waiting
+        await get().getAllRequestCustomer().catch(() => {})
       }
     } catch (error: any) {
       const message = error?.response?.data?.message ?? error?.response?.data?.error ?? error.message ?? "Something went wrong";
