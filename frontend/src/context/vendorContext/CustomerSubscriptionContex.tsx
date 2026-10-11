@@ -280,6 +280,7 @@ export const useCustomerSubscriptionStore = create<CustomerSubscriptionState>()(
       if (res.data.success) {
         // Drop the deleted subscription everywhere it may be cached so the UI is
         // immediately consistent (Total Revenue recomputes without a refetch).
+        // Note: history rows carry their own id, so match them by subscriptionId.
         set((state) => {
           const remainingItems = state.revenueItems.filter((i) => i.subscriptionId !== subscriptionId)
           const recomputedTotal = remainingItems.reduce((sum, i) => sum + (parseFloat(i.revenue) || 0), 0)
@@ -287,6 +288,7 @@ export const useCustomerSubscriptionStore = create<CustomerSubscriptionState>()(
             revenueItems: remainingItems,
             totalRevenue: recomputedTotal.toString(),
             subscribedProducts: state.subscribedProducts.filter((p) => p.id !== subscriptionId),
+            subscriptionHistory: state.subscriptionHistory.filter((h) => h.subscriptionId !== subscriptionId),
           }
         })
       }

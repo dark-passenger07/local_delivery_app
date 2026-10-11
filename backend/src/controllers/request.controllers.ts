@@ -27,6 +27,13 @@ export const customerRequest = async (req: Request, res: Response) => {
 
     const { productId, message, type, start_date, end_date, requestedQuantity } = validateBody.data
 
+    if (start_date > end_date) {
+      return res.status(400).json({
+        message: "Start date cannot be after end date.",
+        success: false,
+      })
+    }
+
     const hourStr = new Intl.DateTimeFormat("en-US", {
       timeZone: "Asia/Kolkata",
       hour: "numeric",
@@ -84,11 +91,59 @@ export const customerRequest = async (req: Request, res: Response) => {
       })
     }
 
+    // Block any new request that overlaps a SKIP request which is still
+    // PENDING or already ACCEPTED for the same product. The blocked dates
+    // stay locked until the SKIP request is REJECTED by the vendor.
+    const blockingSkipRequest = await db.requests.findFirst({
+      where: {
+        vendorCustomerId: vendorCustomer.id,
+        productId: product.id,
+        type: "SKIP",
+        status: { in: ["PENDING", "ACCEPTED"] },
+        start_date: { lte: end_date },
+        end_date: { gte: start_date },
+      },
+      select: {
+        id: true,
+        status: true,
+        start_date: true,
+        end_date: true,
+      },
+    })
+
+    if (blockingSkipRequest) {
+      const fmt = (d: Date) => new Date(d).toLocaleDateString("en-IN")
+      return res.status(409).json({
+        message:
+          blockingSkipRequest.status === "PENDING"
+            ? `You already have a pending skip request (${fmt(blockingSkipRequest.start_date)} - ${fmt(blockingSkipRequest.end_date)}). You can't make another request on those days until the vendor rejects it.`
+            : `These days are already skipped (${fmt(blockingSkipRequest.start_date)} - ${fmt(blockingSkipRequest.end_date)}). You can't make another request on skipped days.`,
+        success: false,
+      })
+    }
+
+    const activeSubscription =
+      product.subscription?.[0] ??
+      (await db.customerSubscription.findFirst({
+        where: {
+          vendorCustomerId: vendorCustomer.id,
+          productId: product.id,
+          status: "ACTIVE",
+        },
+      }))
+
+    if (!activeSubscription) {
+      return res.status(404).json({
+        message: "No active subscription found for this product!",
+        success: false,
+      })
+    }
+
     const newRequest = await db.requests.create({
       data: {
         vendorCustomerId: vendorCustomer.id,
         productId: product.id,
-        subscriptionId: product.subscription[0].id,
+        subscriptionId: activeSubscription.id,
         message,
         start_date,
         end_date,
