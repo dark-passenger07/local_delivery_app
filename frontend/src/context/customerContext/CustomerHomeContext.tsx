@@ -64,6 +64,8 @@ interface CustomerHomeState {
   getCustomerSubscribedProducts: () => Promise<void>,
   customerRequest: (credential: RequestType) => Promise<void>,
   getAllRequestCustomer: () => Promise<void>,
+  cancelCustomerRequest: (id: string) => Promise<void>,
+  removeRequestDetails: (id: string) => void,
   unsubcribeProduct: (id: string) => Promise<void>,
   updateRequestDetails: (updatedRequest :any)=> void
   subcribedProducts: SubscribeProductState[],
@@ -103,6 +105,35 @@ export const useCustomerHomeContext = create<CustomerHomeState>()((set, get) => 
       const message = error?.response?.data?.message ?? error?.response?.data?.error ?? error.message ?? "Something went wrong";
       throw new Error(message);
     }
+  },
+  cancelCustomerRequest: async (id: string) => {
+    try {
+      await axiosInstance.delete(`/request/cancel-request/${id}`)
+      set((state) => {
+        const remaining = state.requestDetails.filter((request) => request.id !== id)
+        return {
+          requestDetails: remaining,
+          pendingNotificationCount: remaining.filter(
+            (request) => request.status?.toUpperCase() === "PENDING"
+          ).length,
+        }
+      })
+      await get().getAllRequestCustomer()
+    } catch (error: any) {
+      const message = error?.response?.data?.message ?? error?.response?.data?.error ?? error.message ?? "Something went wrong";
+      throw new Error(message);
+    }
+  },
+  removeRequestDetails: (id: string) => {
+    set((state) => {
+      const remaining = state.requestDetails.filter((request) => request.id !== id)
+      return {
+        requestDetails: remaining,
+        pendingNotificationCount: remaining.filter(
+          (request) => request.status?.toUpperCase() === "PENDING"
+        ).length,
+      }
+    })
   },
   getAllRequestCustomer: async () => {
     try {

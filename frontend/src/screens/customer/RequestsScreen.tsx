@@ -6,7 +6,8 @@ import {
   FlatList,
   ActivityIndicator,
   TouchableOpacity,
-  RefreshControl
+  RefreshControl,
+  Alert
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useCustomerHomeContext } from "../../context/customerContext/CustomerHomeContext";
@@ -22,12 +23,13 @@ const TABS = [
 export default function RequestsScreen() {
   const { width, isTablet, isLargeTablet, isSmallDevice, gutter, maxWidth, rf, ms, columns } = useResponsive();
   void width; void isLargeTablet; void isSmallDevice; void maxWidth; void columns;
-  const { requestDetails, getAllRequestCustomer } = useCustomerHomeContext();
+  const { requestDetails, getAllRequestCustomer, cancelCustomerRequest } = useCustomerHomeContext();
 
   // Frontend local UI states
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"PENDING" | "APPROVED" | "REJECTED">("PENDING");
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   // Unified fetch handler wrapped in useCallback for stability
   const fetchRequests = useCallback(async () => {
@@ -68,6 +70,31 @@ export default function RequestsScreen() {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
     return isNaN(date.getTime()) ? dateString : date.toLocaleDateString();
+  };
+
+  const handleCancelRequest = (id: string) => {
+    Alert.alert(
+      "Cancel Request",
+      "Are you sure you want to cancel this pending request?",
+      [
+        { text: "Keep it", style: "cancel" },
+        {
+          text: "Cancel Request",
+          style: "destructive",
+          onPress: async () => {
+            setCancellingId(id);
+            try {
+              await cancelCustomerRequest(id);
+            } catch (err: any) {
+              setError(err.message || "Failed to cancel request");
+              Alert.alert("Could not cancel request", err.message || "Please try again.");
+            } finally {
+              setCancellingId(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Small status pill shown on every card so it's clear at a glance, even outside its tab
@@ -147,6 +174,21 @@ export default function RequestsScreen() {
             <Text style={styles.respondedText}>
               Vendor replied on {formatDate(item.respondedAt)}
             </Text>
+          )}
+
+          {item.status?.toUpperCase() === "PENDING" && (
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => handleCancelRequest(item.id)}
+              disabled={cancellingId === item.id}
+              activeOpacity={0.85}
+            >
+              {cancellingId === item.id ? (
+                <ActivityIndicator size="small" color="#DC2626" />
+              ) : (
+                <Text style={styles.cancelButtonText}>Cancel Request</Text>
+              )}
+            </TouchableOpacity>
           )}
         </View>
       </View>
@@ -478,6 +520,22 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: "right",
     fontWeight: "600",
+  },
+  cancelButton: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 42,
+  },
+  cancelButtonText: {
+    color: "#DC2626",
+    fontSize: 14,
+    fontWeight: "800",
   },
   quantityRow: {
     flexDirection: "row",

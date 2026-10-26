@@ -3,6 +3,7 @@ import { z } from "zod"
 import { db } from "../libs/db.js"
 import type { Requests } from "../generated/zod/index.js"
 import { sendNotification } from "../services/notification.service.js"
+import { SubscriptionService } from "../services/subscription.service.js"
 
 const RequestSchema = z.object({
   type: z.enum(["SKIP", "INCREASE", "DECREASE"]),
@@ -137,6 +138,23 @@ export const customerRequest = async (req: Request, res: Response) => {
         message: "No active subscription found for this product!",
         success: false,
       })
+    }
+
+    if (type === "DECREASE" && requestedQuantity !== null && requestedQuantity !== undefined) {
+      const currentQuantity = await SubscriptionService.getLowestEffectiveQuantityForRange(
+        vendorCustomer.id,
+        product.id,
+        activeSubscription.dailyQuantity.toString(),
+        start_date,
+        end_date
+      )
+
+      if (requestedQuantity > currentQuantity) {
+        return res.status(400).json({
+          message: `You can't decrease by more than your current quantity. Your current quantity for the selected dates is ${currentQuantity}.`,
+          success: false,
+        })
+      }
     }
 
     const newRequest = await db.requests.create({
@@ -353,6 +371,88 @@ export const vendorResponse = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     console.log("Error updating the customer request: ", error.message)
+    return res.status(500).json({
+      message: "Internal Server Error",
+      success: false,
+    })
+  }
+}
+
+export const cancelCustomerRequest = async (req: Request, res: Response) => {
+  try {
+    const user = req.user
+    if (!user) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      })
+    }
+
+    const requestId = req.params.id as string
+    if (!requestId) {
+      return res.status(400).json({
+        message: "Request ID is required",
+        success: false,
+      })
+    }
+
+    const request = await db.requests.findUnique({
+      where: { id: requestId },
+      include: {
+        vendorCustomers: {
+          select: {
+            customerId: true,
+            vendorId: true,
+          },
+        },
+        product: {
+          select: {
+            productName: true,
+          },
+        },
+      },
+    })
+
+    if (!request) {
+      return res.status(404).json({
+        message: "Request not found",
+        success: false,
+      })
+    }
+
+    // A customer can only cancel their own request.
+    if (request.vendorCustomers.customerId !== user.id) {
+      return res.status(403).json({
+        message: "You are not allowed to cancel this request",
+        success: false,
+      })
+    }
+
+    // Once the vendor has responded, the request is no longer cancellable.
+    if (request.status !== "PENDING") {
+      return res.status(400).json({
+        message: "Only pending requests can be cancelled",
+        success: false,
+      })
+    }
+
+    await db.requests.delete({ where: { id: requestId } })
+
+    // Remove it from the vendor's list in real time.
+    req.io.to(request.vendorCustomers.vendorId).emit("request_cancelled", {
+      requestId,
+      productId: request.productId,
+      productName: request.product?.productName,
+      customerId: user.id,
+    })
+
+    return res.status(200).json({
+      message: "Request cancelled successfully!",
+      success: true,
+      requestId,
+    })
+  } catch (error: any) {
+    console.log("Error cancelling the customer request: ", error.message)
     return res.status(500).json({
       message: "Internal Server Error",
       success: false,

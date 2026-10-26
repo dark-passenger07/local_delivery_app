@@ -406,27 +406,18 @@ export class SubscriptionService {
       let requestId: string | null = null;
 
       if (!isBeforeStart && !isAfterStop) {
-        const effectiveRequest = this.getEffectiveRequestForDate(dayDate, acceptedRequests);
+        const dayState = this.getEffectiveDayState(
+          dayDate,
+          subscription.dailyQuantity.toString(),
+          acceptedRequests
+        );
 
-        if (effectiveRequest) {
-
-          requestType = effectiveRequest.type;
-          requestId = effectiveRequest.id;
-
-          if (effectiveRequest.type === "SKIP") {
-            quantity = "0";
-            isSkipped = true;
-          } else if (effectiveRequest.type === "INCREASE" && effectiveRequest.requestedQuantity) {
-            const base = parseFloat(subscription.dailyQuantity.toString()) || 0;
-            const increase = parseFloat(effectiveRequest.requestedQuantity.toString()) || 0;
-            quantity = (base + increase).toString();
-            isDelivered = true;
-          } else if (effectiveRequest.type === "DECREASE" && effectiveRequest.requestedQuantity) {
-            const base = parseFloat(subscription.dailyQuantity.toString()) || 0;
-            const decrease = parseFloat(effectiveRequest.requestedQuantity.toString()) || 0;
-            quantity = Math.max(0, base - decrease).toString();
-            isDelivered = true;
-          }
+        if (dayState.hasRequest) {
+          requestType = dayState.requestType;
+          requestId = dayState.requestId;
+          quantity = dayState.quantity;
+          isSkipped = dayState.isSkipped;
+          isDelivered = !dayState.isSkipped;
         } else if (!isUpcoming) {
           isDelivered = true;
         }
@@ -477,25 +468,125 @@ export class SubscriptionService {
     baseQuantity: string,
     acceptedRequests: any[]
   ): string {
-    const effectiveRequest = this.getEffectiveRequestForDate(date, acceptedRequests);
+    return this.getEffectiveDayState(date, baseQuantity, acceptedRequests).quantity;
+  }
 
-    if (!effectiveRequest) {
-      return baseQuantity;
+  /**
+   * The lowest effective daily quantity across a date range, taking already
+   * accepted INCREASE/DECREASE requests into account. Used to stop a customer
+   * from decreasing by more than they actually have on any selected day.
+   */
+  static async getLowestEffectiveQuantityForRange(
+    vendorCustomerId: string,
+    productId: string,
+    baseQuantity: string,
+    rangeStart: Date,
+    rangeEnd: Date
+  ): Promise<number> {
+    const acceptedRequests = await db.requests.findMany({
+      where: {
+        vendorCustomerId,
+        productId,
+        status: "ACCEPTED",
+      },
+    });
+
+    const start = new Date(rangeStart);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(rangeEnd);
+    end.setHours(0, 0, 0, 0);
+
+    if (start > end) {
+      return parseFloat(baseQuantity) || 0;
     }
 
-    if (effectiveRequest.type === "SKIP") {
-      return "0";
-    } else if (effectiveRequest.type === "INCREASE" && effectiveRequest.requestedQuantity) {
-      const base = parseFloat(baseQuantity) || 0;
-      const increase = parseFloat(effectiveRequest.requestedQuantity.toString()) || 0;
-      return (base + increase).toString();
-    } else if (effectiveRequest.type === "DECREASE" && effectiveRequest.requestedQuantity) {
-      const base = parseFloat(baseQuantity) || 0;
-      const decrease = parseFloat(effectiveRequest.requestedQuantity.toString()) || 0;
-      return Math.max(0, base - decrease).toString();
+    let lowest = Infinity;
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const quantity = parseFloat(
+        this.getEffectiveQuantityForDate(d, baseQuantity, acceptedRequests)
+      );
+      if (Number.isFinite(quantity) && quantity < lowest) {
+        lowest = quantity;
+      }
     }
 
-    return baseQuantity;
+    return lowest === Infinity ? parseFloat(baseQuantity) || 0 : lowest;
+  }
+
+  /**
+   * Resolve everything that applies to a single day. More than one accepted
+   * request can cover the same date (for example an INCREASE followed by a
+   * DECREASE), so all of them are composed instead of letting only the most
+   * recently updated one win. A SKIP always takes precedence because no
+   * delivery happens on a skipped day.
+   */
+  private static getEffectiveDayState(
+    date: Date,
+    baseQuantity: string,
+    acceptedRequests: any[]
+  ): {
+    quantity: string;
+    isSkipped: boolean;
+    requestType: string | null;
+    requestId: string | null;
+    hasRequest: boolean;
+  } {
+    const applicableRequests = this.getApplicableRequestsForDate(date, acceptedRequests);
+
+    if (applicableRequests.length === 0) {
+      return {
+        quantity: baseQuantity,
+        isSkipped: false,
+        requestType: null,
+        requestId: null,
+        hasRequest: false,
+      };
+    }
+
+    // `applicableRequests` is newest-first, so the first entry is the latest
+    // request and is used for the type/id shown on the calendar.
+    const latestRequest = applicableRequests[0];
+    const skipRequest = applicableRequests.find((req) => req.type === "SKIP");
+
+    if (skipRequest) {
+      return {
+        quantity: "0",
+        isSkipped: true,
+        requestType: "SKIP",
+        requestId: skipRequest.id,
+        hasRequest: true,
+      };
+    }
+
+    // Apply every accepted quantity request in the order the customer raised
+    // them so an increase followed by a decrease (or vice versa) is reflected
+    // cumulatively rather than discarding the earlier request.
+    const chronologicalRequests = [...applicableRequests].sort((a, b) => {
+      const aTime = new Date(a.createdAt ?? a.updatedAt ?? 0).getTime();
+      const bTime = new Date(b.createdAt ?? b.updatedAt ?? 0).getTime();
+      return aTime - bTime;
+    });
+
+    let quantity = parseFloat(baseQuantity) || 0;
+    for (const request of chronologicalRequests) {
+      if (!request.requestedQuantity) {
+        continue;
+      }
+      const requested = parseFloat(request.requestedQuantity.toString()) || 0;
+      if (request.type === "INCREASE") {
+        quantity += requested;
+      } else if (request.type === "DECREASE") {
+        quantity = Math.max(0, quantity - requested);
+      }
+    }
+
+    return {
+      quantity: quantity.toString(),
+      isSkipped: false,
+      requestType: latestRequest.type,
+      requestId: latestRequest.id,
+      hasRequest: true,
+    };
   }
 
   /**
@@ -801,8 +892,8 @@ export class SubscriptionService {
     };
   }
 
-  private static getEffectiveRequestForDate(date: Date, acceptedRequests: any[]) {
-    const applicableRequests = acceptedRequests
+  private static getApplicableRequestsForDate(date: Date, acceptedRequests: any[]) {
+    return acceptedRequests
       .filter((req) => {
         const reqStart = new Date(req.start_date);
         const reqEnd = new Date(req.end_date);
@@ -811,8 +902,10 @@ export class SubscriptionService {
         return date >= reqStart && date <= reqEnd;
       })
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  }
 
-    return applicableRequests[0] ?? null;
+  private static getEffectiveRequestForDate(date: Date, acceptedRequests: any[]) {
+    return this.getApplicableRequestsForDate(date, acceptedRequests)[0] ?? null;
   }
 }
 

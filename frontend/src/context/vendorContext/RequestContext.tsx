@@ -50,6 +50,7 @@ interface RequestState {
   customerRequests: CustomerRequest[];
   getCustomerRequests: () => Promise<void>;
   updateRequest: (id: string, status: Status) => Promise<void>;
+  removeCustomerRequest: (id: string) => void;
   pendingNotificationCount: number;
   addPendingNotification: () => void;
   clearPendingNotifications: () => void;
@@ -102,6 +103,15 @@ export const useRequestStore = create<RequestState>()((set, get) => ({
         customerRequests: [newRequest, ...state.customerRequests],
         pendingNotificationCount: state.pendingNotificationCount + 1
       }))
+  },
+  removeCustomerRequest: (id: string) => {
+    set((state) => {
+      const remaining = state.customerRequests.filter((request) => request.id !== id)
+      return {
+        customerRequests: remaining,
+        pendingNotificationCount: remaining.filter((request) => request.status === "PENDING").length,
+      }
+    })
   },
   addPendingNotification: () => {
     set((state) => ({ pendingNotificationCount: state.pendingNotificationCount + 1 }))
