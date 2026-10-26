@@ -108,6 +108,15 @@ export const useSocketStore = create<SocketStore>()((set, get) => ({
       useRequestStore.getState().getNewRequest(mappedRequest)
     })
 
+    // when a customer cancels a pending request remove it everywhere instantly
+    socket.on("request_cancelled", (data: { requestId?: string } | string) => {
+      const requestId = typeof data === "string" ? data : data?.requestId
+      if (!requestId) return
+
+      useRequestStore.getState().removeCustomerRequest(requestId)
+      useCustomerHomeContext.getState().removeRequestDetails(requestId)
+    })
+
     // update the customer when vendor deletes their product
     socket.on("update_vendor_product", (data) => {
       const { action, productId } = data;
@@ -177,6 +186,7 @@ export const useSocketStore = create<SocketStore>()((set, get) => ({
       socket.off("connect");
       socket.off("connect_error");
       socket.off("new_request_created");
+      socket.off("request_cancelled");
       socket.off("Updated_Product_response");
       socket.off("vendor_update_response");
       socket.off("update_vendor_product");
