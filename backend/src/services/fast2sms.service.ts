@@ -42,9 +42,8 @@ interface Fast2SmsResponse {
 
 async function callFast2Sms(phone: string, code: string): Promise<any> {
   const apiKey = process.env.FAST2SMS_API_KEY;
-  if (!apiKey || apiKey === "DEMO_FAST2SMS_API_KEY_REPLACE_ME") {
-    // In dev/demo mode, skip the real HTTP call and just log the OTP so you
-    // can test without real credentials.
+
+  if (!apiKey) {
     console.log(
       `[Fast2SMS DEMO] OTP for ${phone}: ${code}  (set FAST2SMS_API_KEY to send real SMS)`
     );
@@ -57,20 +56,13 @@ async function callFast2Sms(phone: string, code: string): Promise<any> {
       authorization: apiKey,
       "Content-Type": "application/json",
     },
-    // body: JSON.stringify({
-    //   route: "q",
-    //   message: `Your project verification code is ${code}`, // Must exactly match the Fast2SMS No-DLT template
-    //   language: "english",
-    //   flash: 0,
-    //   numbers: phone,
-    // }),
     body: JSON.stringify({
       route: "q",
       // Bypasses the DLT filter by removing words like "OTP" or "Verification"
       message: `Your secure pin is ${code} for accessing your account.`,
       language: "english",
       flash: 0,
-      numbers: String(phone), // Enforces string parsing just in case
+      numbers: String(phone),
     }),
   });
 
