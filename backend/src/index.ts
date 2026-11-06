@@ -12,6 +12,7 @@ import cors from "cors"
 import { Server } from "socket.io"
 import http from "http"
 import pushRouter from "./routes/push.notification.routes.js";
+import otpRouter from "./routes/otp.routes.js";
 
 dotenv.config();
 
@@ -81,6 +82,7 @@ app.use("/customer", vendorCustomers)
 app.use("/subscription", customerSubscriptionRouter)
 app.use("/request", requestRouter)
 app.use("/notification", pushRouter)
+app.use("/otp", otpRouter)
 
 
 server.listen(PORT, () => {

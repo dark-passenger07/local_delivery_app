@@ -21,7 +21,7 @@ import { COLORS, SHADOWS } from "../../theme/tokens";
 export default function LoginScreen({ navigation }: any) {
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const { login } = useAuthStore();
+  const { sendOtp } = useAuthStore();
   const { width, isTablet, isSmallDevice, gutter, maxWidth, rf, ms } =
     useResponsive();
 
@@ -33,7 +33,6 @@ export default function LoginScreen({ navigation }: any) {
   const titleFontSize = isSmallDevice ? rf(24) : rf(28);
   const subtitleFontSize = isSmallDevice ? rf(14) : rf(16);
   const buttonHeight = isSmallDevice ? ms(52) : ms(56);
-
   const handleLogin = async () => {
     if (!phoneNumber.trim()) {
       Alert.alert("Missing Number", "Please type your phone number to continue.");
@@ -60,21 +59,25 @@ export default function LoginScreen({ navigation }: any) {
 
     try {
       setLoading(true);
-      // Removed name parameter to only pass phone number string
-      const res = await login({ phone: normalizedNumber });
+      // Ask backend to send an OTP via Fast2SMS
+      await sendOtp(normalizedNumber, "LOGIN");
 
-      if (res.success || res) {
-        Toast.show({
-          type: "success",
-          text1: "Welcome! You're logged in",
-          position: "top",
-          visibilityTime: 2200,
-        });
-      }
+      Toast.show({
+        type: "info",
+        text1: "OTP Sent",
+        text2: "Please type the code we sent you.",
+        position: "top",
+        visibilityTime: 2000,
+      });
+
+      navigation.navigate("OtpVerification", {
+        phone: normalizedNumber,
+        purpose: "LOGIN",
+      });
     } catch (error: any) {
       Toast.show({
         type: "error",
-        text1: "Could Not Log In",
+        text1: "Could Not Send Code",
         text2: error.message || "Something went wrong. Please try again.",
         position: "top",
         visibilityTime: 3000,
