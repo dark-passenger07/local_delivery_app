@@ -7,12 +7,15 @@ import {
   ActivityIndicator,
   StyleSheet,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 import { useCustomerSubscriptionStore, type CalendarDayType } from '../../context/customerContext/CustomerSubscriptionContext';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useResponsive } from '../../utils/responsive';
+import { COLORS, SHADOWS } from '../../theme/tokens';
 
 type CalendarRouteParams = {
   SubscriptionCalendar: {
@@ -25,6 +28,8 @@ type CalendarRouteParams = {
 const WEEK_DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
 export default function SubscriptionCalendarScreen() {
+  const { width, isTablet, isLargeTablet, isSmallDevice, gutter, maxWidth, rf, ms, columns } = useResponsive();
+  void width; void isLargeTablet; void isSmallDevice; void maxWidth; void columns;
   const route = useRoute<RouteProp<CalendarRouteParams, 'SubscriptionCalendar'>>()
   const navigation = useNavigation<NativeStackNavigationProp<any>>()
   const subscriptionId = route.params?.subscriptionId || ''
@@ -96,25 +101,26 @@ export default function SubscriptionCalendarScreen() {
   }, [calendar])
 
   const getDayStyle = (item: CalendarDayType) => {
+    const base = { ...styles.calendarCell, width: '13.2%' as const, margin: ms(2) };
     if (item.requestType === 'SKIP' && item.isSkipped) {
-      return { ...styles.calendarCell, backgroundColor: '#FEE2E2' }
+      return { ...base, backgroundColor: '#FEE2E2' }
     }
     if (item.isUpcoming && item.isCurrentMonth) {
-      return { ...styles.calendarCell, backgroundColor: '#F1F5F9' }
+      return { ...base, backgroundColor: '#F1F5F9' }
     }
     if (item.isBeforeStart) {
-      return { ...styles.calendarCell, backgroundColor: '#F8FAFC' }
+      return { ...base, backgroundColor: '#F8FAFC' }
     }
     if (item.isStoppedDay) {
-      return { ...styles.calendarCell, backgroundColor: '#F1F5F9' }
+      return { ...base, backgroundColor: '#F1F5F9' }
     }
     if (!item.isDelivered && item.isCurrentMonth) {
-      return { ...styles.calendarCell, backgroundColor: '#FEF3C7' }
+      return { ...base, backgroundColor: '#FEF3C7' }
     }
     if (item.isDelivered && item.isCurrentMonth) {
-      return { ...styles.calendarCell, backgroundColor: '#DCFCE7' }
+      return { ...base, backgroundColor: '#DCFCE7' }
     }
-    return { ...styles.calendarCell, backgroundColor: '#F8FAFC' }
+    return { ...base, backgroundColor: '#F8FAFC' }
   }
 
   const getDayTextStyle = (item: CalendarDayType) => {
@@ -140,29 +146,31 @@ export default function SubscriptionCalendarScreen() {
   }
 
   const renderDayQuantity = (item: CalendarDayType) => {
+    const qtySize = Math.max(rf(9), 9);
     if (!item.isCurrentMonth || item.isUpcoming) {
-      return <Text style={styles.dayQuantityOuter}>{item.quantity}</Text>
+      return <Text style={[styles.dayQuantityOuter, { fontSize: qtySize }]}>{item.quantity}</Text>
     }
     if (item.isBeforeStart) {
-      return <Text style={styles.dayQuantityOuter}>-</Text>
+      return <Text style={[styles.dayQuantityOuter, { fontSize: qtySize }]}>-</Text>
     }
     if (item.isStoppedDay) {
-      return <Text style={styles.dayQuantityOuter}>-</Text>
+      return <Text style={[styles.dayQuantityOuter, { fontSize: qtySize }]}>-</Text>
     }
     if (item.requestType === 'SKIP' && item.isSkipped) {
-      return <Text style={styles.dayQuantitySkipped}>{item.quantity}</Text>
+      return <Text style={[styles.dayQuantitySkipped, { fontSize: qtySize }]}>{item.quantity}</Text>
     }
     if (!item.isDelivered) {
-      return <Text style={styles.dayQuantityPending}>{item.quantity}</Text>
+      return <Text style={[styles.dayQuantityPending, { fontSize: qtySize }]}>{item.quantity}</Text>
     }
-    return <Text style={styles.dayQuantityActive}>{item.quantity}</Text>
+    return <Text style={[styles.dayQuantityActive, { fontSize: qtySize }]}>{item.quantity}</Text>
   }
 
   const renderCell = ({ item }: { item: CalendarDayType }) => {
+    const daySize = rf(12);
     if (!item.isCurrentMonth || item.isBeforeStart || item.isStoppedDay) {
       return (
         <View style={getDayStyle(item)}>
-          <Text style={getDayTextStyle(item)}>{item.dayNumber}</Text>
+          <Text style={[getDayTextStyle(item), { fontSize: daySize }]}>{item.dayNumber}</Text>
           {renderDayQuantity(item)}
         </View>
       )
@@ -181,41 +189,47 @@ export default function SubscriptionCalendarScreen() {
           }
         }}
       >
-        <Text style={getDayTextStyle(item)}>{item.dayNumber}</Text>
+        <Text style={[getDayTextStyle(item), { fontSize: daySize }]}>{item.dayNumber}</Text>
         {renderDayQuantity(item)}
       </TouchableOpacity>
     )
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: ms(24) }}
+        keyboardShouldPersistTaps="handled"
+      >
+      <View style={[styles.header, { paddingHorizontal: gutter }]}>
         <View style={styles.headerTopRow}>
           <TouchableOpacity
-            style={styles.backButton}
+            style={[styles.backButton, { width: ms(44), height: ms(44), borderRadius: ms(22) }]}
             onPress={() => navigation.goBack()}
           >
             <Text style={styles.backButtonText}>‹</Text>
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
-            <Text style={styles.headerTitle}>Delivery Calendar</Text>
+            <Text style={[styles.headerTitle, { fontSize: rf(24) }]}>Delivery Calendar</Text>
             <Text style={styles.headerSubtitle} numberOfLines={1}>{vendorBusinessName} • {productName}</Text>
           </View>
         </View>
-        <View style={styles.monthRow}>
-          <TouchableOpacity style={styles.monthButton} onPress={goToPrevMonth} activeOpacity={0.8}>
+        <View style={[styles.monthRow, SHADOWS.card]}>
+          <TouchableOpacity style={[styles.monthButton, { width: ms(44), height: ms(44), borderRadius: ms(22) }]} onPress={goToPrevMonth} activeOpacity={0.8}>
             <Text style={styles.monthButtonText}>‹</Text>
           </TouchableOpacity>
-          <Text style={styles.monthLabel}>
+          <Text style={[styles.monthLabel, { fontSize: rf(18) }]}>
             {monthNames[month - 1]} {year}
           </Text>
-          <TouchableOpacity style={styles.monthButton} onPress={goToNextMonth} activeOpacity={0.8}>
+          <TouchableOpacity style={[styles.monthButton, { width: ms(44), height: ms(44), borderRadius: ms(22) }]} onPress={goToNextMonth} activeOpacity={0.8}>
             <Text style={styles.monthButtonText}>›</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.calendarContainer}>
+      <View style={[styles.calendarOuter, { paddingHorizontal: gutter }]}>
+      <View style={[styles.calendarContainer, SHADOWS.card, { width: '100%', maxWidth: isTablet ? 680 : 520, alignSelf: 'center' }]}>
         <View style={styles.weekRow}>
           {WEEK_DAYS.map((day) => (
             <View key={day} style={styles.weekCell}>
@@ -226,7 +240,7 @@ export default function SubscriptionCalendarScreen() {
 
         {calendarLoading ? (
           <View style={styles.calendarLoading}>
-            <ActivityIndicator size="small" color="#2563EB" />
+            <ActivityIndicator size="small" color={COLORS.primary} />
             <Text style={styles.calendarLoadingText}>Loading calendar…</Text>
           </View>
         ) : (
@@ -235,6 +249,7 @@ export default function SubscriptionCalendarScreen() {
             keyExtractor={(item) => item.date}
             renderItem={renderCell}
             numColumns={7}
+            scrollEnabled={false}
             contentContainerStyle={styles.calendarGrid}
             showsVerticalScrollIndicator={false}
             removeClippedSubviews={false}
@@ -246,23 +261,24 @@ export default function SubscriptionCalendarScreen() {
           />
         )}
       </View>
+      </View>
 
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
+      <View style={[styles.statsRow, { marginHorizontal: gutter }]}>
+        <View style={[styles.statItem, SHADOWS.card, { minWidth: ms(90) }]}>
           <Text style={styles.statLabel}>Monthly Delivered Qty</Text>
           <Text style={styles.statValue}>{monthStats.monthlyDeliveredQuantity}</Text>
         </View>
-        <View style={styles.statItem}>
+        <View style={[styles.statItem, SHADOWS.card, { minWidth: ms(90) }]}>
           <Text style={styles.statLabel}>Received Days</Text>
           <Text style={styles.statValue}>{monthStats.deliveredDays}</Text>
         </View>
-        <View style={styles.statItem}>
+        <View style={[styles.statItem, SHADOWS.card, { minWidth: ms(90) }]}>
           <Text style={styles.statLabel}>Skipped Days</Text>
           <Text style={styles.statValue}>{monthStats.skippedDays}</Text>
         </View>
       </View>
 
-      <View style={styles.legendRow}>
+      <View style={[styles.legendRow, { marginHorizontal: gutter }]}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: '#DCFCE7' }]} />
           <Text style={styles.legendText}>Delivered</Text>
@@ -280,6 +296,7 @@ export default function SubscriptionCalendarScreen() {
           <Text style={styles.legendText}>Upcoming</Text>
         </View>
       </View>
+      </ScrollView>
     </SafeAreaView>
   )
 }
@@ -352,9 +369,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  calendarOuter: { width: '100%' },
   calendarContainer: {
     flex: 1,
-    marginHorizontal: 20,
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     borderWidth: 1,
@@ -368,7 +385,7 @@ const styles = StyleSheet.create({
   calendarGrid: { paddingBottom: 12 },
   calendarRow: { flexDirection: 'row' },
   calendarCell: {
-    width: '13.28%',
+    width: '13.2%',
     aspectRatio: 1,
     margin: 2,
     borderRadius: 12,

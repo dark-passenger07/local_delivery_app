@@ -3,8 +3,12 @@ import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, Scr
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuthStore } from '../../context/vendorContext/AuthContext';
+import { useResponsive } from '../../utils/responsive';
+import { COLORS, SHADOWS } from '../../theme/tokens';
 
 const ProfileScreen = () => {
+  const { width, isTablet, isLargeTablet, isSmallDevice, gutter, maxWidth, rf, ms, columns } = useResponsive();
+  void isLargeTablet; void isSmallDevice; void columns; void maxWidth;
   const { logout, user, authUser, updateProfile } = useAuthStore();
   const insets = useSafeAreaInsets();
 
@@ -108,30 +112,30 @@ const ProfileScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.center}>
-        <ActivityIndicator size="large" color="#6366F1" />
+      <SafeAreaView style={[styles.center, { backgroundColor: COLORS.bg }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading your profile…</Text>
       </SafeAreaView>
     );
   }
 
-  const infoRows: { icon: string; label: string; value?: string }[] = [
-    { icon: '👤', label: 'Role', value: user?.role },
-    { icon: '📞', label: 'Phone', value: user?.phone },
-    { icon: '📍', label: 'Address', value: user?.address }
+  const infoRows: { icon: 'user' | 'phone' | 'map-pin'; label: string; value?: string }[] = [
+    { icon: 'user', label: 'Role', value: user?.role },
+    { icon: 'phone', label: 'Phone', value: user?.phone },
+    { icon: 'map-pin', label: 'Address', value: user?.address }
   ];
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={['top', 'left', 'right']}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingHorizontal: gutter, paddingBottom: ms(32), maxWidth: isTablet ? 720 : 520, width: '100%', alignSelf: 'center' }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366F1" colors={['#6366F1']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />
         }
       >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
+          <Text style={[styles.headerTitle, { fontSize: rf(26) }]}>Profile</Text>
           <TouchableOpacity
             style={styles.editButton}
             onPress={openEdit}
@@ -139,13 +143,13 @@ const ProfileScreen = () => {
             accessibilityRole="button"
             accessibilityLabel="Edit profile"
           >
-            <Feather name="edit-2" size={14} color="#6366F1" />
-            <Text style={styles.editButtonText}>Edit</Text>
+            <Feather name="edit-2" size={14} color={COLORS.primary} />
+            <Text style={[styles.editButtonText, { color: COLORS.primary }]}>Edit</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.profileCard}>
-          <View style={styles.avatarCircle}>
+        <View style={[styles.profileCard, SHADOWS.card, { paddingVertical: ms(28) }]}>
+          <View style={[styles.avatarCircle, { width: ms(76), height: ms(76), borderRadius: ms(38), backgroundColor: COLORS.primary }]}>
             <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
           </View>
           <Text style={styles.userName}>{user?.name || 'Unnamed User'}</Text>
@@ -156,14 +160,14 @@ const ProfileScreen = () => {
           ) : null}
         </View>
 
-        <View style={styles.infoCard}>
+        <View style={[styles.infoCard, SHADOWS.card]}>
           {infoRows.map((row, index) => (
             <View
               key={row.label}
               style={[styles.infoRow, index === infoRows.length - 1 && styles.infoRowLast]}
             >
               <View style={styles.infoIconCircle}>
-                <Text style={styles.infoIconText}>{row.icon}</Text>
+                <Feather name={row.icon} size={16} color={COLORS.primary} />
               </View>
               <View style={styles.infoTextBlock}>
                 <Text style={styles.infoLabel}>{row.label}</Text>
@@ -200,7 +204,7 @@ const ProfileScreen = () => {
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
           style={styles.modalOverlay}
         >
-          <View style={[styles.modalCard, { paddingBottom: Math.max(24, insets.bottom + 16) }]}>
+          <View style={[styles.modalCard, { paddingBottom: Math.max(24, insets.bottom + 16), width: width * 0.92, maxWidth: isTablet ? 560 : 440, maxHeight: '90%', alignSelf: 'center' }]}>
             <View style={styles.modalHandle} />
             <ScrollView
               showsVerticalScrollIndicator={false}
@@ -251,7 +255,7 @@ const ProfileScreen = () => {
                   <Text style={styles.modalCancelText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.modalButton, styles.modalSaveButton, saving && styles.modalSaveDisabled]}
+                  style={[styles.modalButton, styles.modalSaveButton, SHADOWS.button, saving && styles.modalSaveDisabled]}
                   onPress={handleSaveProfile}
                   disabled={saving}
                   activeOpacity={0.85}
@@ -272,14 +276,14 @@ const ProfileScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F6FA' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F6FA' },
+  container: { flex: 1, backgroundColor: '#F4F6FB' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F4F6FB' },
   loadingText: { marginTop: 12, color: '#6B7280', fontSize: 14, fontWeight: '500' },
 
   scrollContent: { paddingHorizontal: 20, paddingBottom: 32, flexGrow: 1 },
 
   header: { paddingTop: 12, paddingBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  headerTitle: { fontSize: 26, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 },
   editButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -291,7 +295,7 @@ const styles = StyleSheet.create({
     borderColor: '#E0E2F0',
     backgroundColor: '#FFFFFF',
   },
-  editButtonText: { color: '#6366F1', fontSize: 14, fontWeight: '700' },
+  editButtonText: { color: '#2563EB', fontSize: 14, fontWeight: '700' },
 
   profileCard: {
     backgroundColor: '#FFFFFF',
@@ -308,11 +312,11 @@ const styles = StyleSheet.create({
     borderColor: '#F0F1F5'
   },
   avatarCircle: {
-    width: 76, height: 76, borderRadius: 38, backgroundColor: '#6366F1',
+    width: 76, height: 76, borderRadius: 38, backgroundColor: '#2563EB',
     alignItems: 'center', justifyContent: 'center', marginBottom: 12
   },
   avatarText: { color: '#FFFFFF', fontWeight: '800', fontSize: 26 },
-  userName: { fontSize: 19, fontWeight: '800', color: '#111827' },
+  userName: { fontSize: 19, fontWeight: '800', color: '#0F172A' },
 
   roleBadge: {
     marginTop: 8,
@@ -321,7 +325,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20
   },
-  roleBadgeText: { fontSize: 12, fontWeight: '700', color: '#6366F1', textTransform: 'capitalize' },
+  roleBadgeText: { fontSize: 12, fontWeight: '700', color: '#2563EB', textTransform: 'capitalize' },
 
   infoCard: {
     backgroundColor: '#FFFFFF',
@@ -345,13 +349,13 @@ const styles = StyleSheet.create({
   },
   infoRowLast: { borderBottomWidth: 0 },
   infoIconCircle: {
-    width: 38, height: 38, borderRadius: 19, backgroundColor: '#F5F6FA',
+    width: 38, height: 38, borderRadius: 19, backgroundColor: '#F4F6FB',
     alignItems: 'center', justifyContent: 'center', marginRight: 12
   },
   infoIconText: { fontSize: 16 },
   infoTextBlock: { flex: 1 },
   infoLabel: { fontSize: 12, color: '#6B7280', fontWeight: '600', marginBottom: 2 },
-  infoValue: { fontSize: 15, color: '#111827', fontWeight: '600' },
+  infoValue: { fontSize: 15, color: '#0F172A', fontWeight: '600' },
 
   logoutButton: {
     backgroundColor: '#FEF2F2',
@@ -388,7 +392,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   modalScrollContent: { paddingBottom: 8 },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 18 },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A', marginBottom: 18 },
   modalLabel: {
     fontSize: 12,
     fontWeight: '700',
@@ -398,14 +402,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   modalInput: {
-    backgroundColor: '#F5F6FA',
+    backgroundColor: '#F4F6FB',
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 13,
     fontSize: 15,
-    color: '#111827',
+    color: '#0F172A',
     fontWeight: '500',
     marginBottom: 16,
   },
@@ -421,7 +425,7 @@ const styles = StyleSheet.create({
   },
   modalCancelButton: { backgroundColor: '#F0F1F5' },
   modalCancelText: { color: '#6B7280', fontSize: 16, fontWeight: '700' },
-  modalSaveButton: { backgroundColor: '#6366F1' },
+  modalSaveButton: { backgroundColor: '#2563EB' },
   modalSaveDisabled: { backgroundColor: '#A5B4FC' },
   modalSaveText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });

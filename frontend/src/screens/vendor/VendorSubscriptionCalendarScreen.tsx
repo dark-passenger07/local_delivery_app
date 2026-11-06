@@ -7,8 +7,11 @@ import {
   ActivityIndicator,
   StyleSheet,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useResponsive } from '../../utils/responsive';
+import { SHADOWS } from '../../theme/tokens';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 import { useCustomerSubscriptionStore, type CalendarDayType } from '../../context/vendorContext/CustomerSubscriptionContex';
@@ -33,6 +36,7 @@ export default function VendorSubscriptionCalendarScreen() {
   const { calendar, calendarLoading, currentCalendarMonth, currentCalendarYear, fetchVendorCalendar } = useCustomerSubscriptionStore()
   const [month, setMonth] = useState(currentCalendarMonth)
   const [year, setYear] = useState(currentCalendarYear)
+  const { isTablet, gutter, rf, ms } = useResponsive()
 
   useEffect(() => {
     if (subscriptionId) {
@@ -97,24 +101,24 @@ export default function VendorSubscriptionCalendarScreen() {
 
   const getDayStyle = (item: CalendarDayType) => {
     if (item.requestType === 'SKIP' && item.isSkipped) {
-      return { ...styles.calendarCell, backgroundColor: '#FEE2E2' }
+      return { ...styles.calendarCell, backgroundColor: '#FEE2E2', margin: ms(2) }
     }
     if (item.isUpcoming && item.isCurrentMonth) {
-      return { ...styles.calendarCell, backgroundColor: '#F1F5F9' }
+      return { ...styles.calendarCell, backgroundColor: '#F1F5F9', margin: ms(2) }
     }
     if (item.isBeforeStart) {
-      return { ...styles.calendarCell, backgroundColor: '#F8FAFC' }
+      return { ...styles.calendarCell, backgroundColor: '#F8FAFC', margin: ms(2) }
     }
     if (item.isStoppedDay) {
-      return { ...styles.calendarCell, backgroundColor: '#F1F5F9' }
+      return { ...styles.calendarCell, backgroundColor: '#F1F5F9', margin: ms(2) }
     }
     if (!item.isDelivered && item.isCurrentMonth) {
-      return { ...styles.calendarCell, backgroundColor: '#FEF3C7' }
+      return { ...styles.calendarCell, backgroundColor: '#FEF3C7', margin: ms(2) }
     }
     if (item.isDelivered && item.isCurrentMonth) {
-      return { ...styles.calendarCell, backgroundColor: '#DCFCE7' }
+      return { ...styles.calendarCell, backgroundColor: '#DCFCE7', margin: ms(2) }
     }
-    return { ...styles.calendarCell, backgroundColor: '#F8FAFC' }
+    return { ...styles.calendarCell, backgroundColor: '#F8FAFC', margin: ms(2) }
   }
 
   const getDayTextStyle = (item: CalendarDayType) => {
@@ -140,29 +144,31 @@ export default function VendorSubscriptionCalendarScreen() {
   }
 
   const renderDayQuantity = (item: CalendarDayType) => {
+    const qtySize = { fontSize: rf(9) }
     if (!item.isCurrentMonth || item.isUpcoming) {
-      return <Text style={styles.dayQuantityOuter}>{item.quantity}</Text>
+      return <Text style={[styles.dayQuantityOuter, qtySize]}>{item.quantity}</Text>
     }
     if (item.isBeforeStart) {
-      return <Text style={styles.dayQuantityOuter}>-</Text>
+      return <Text style={[styles.dayQuantityOuter, qtySize]}>-</Text>
     }
     if (item.isStoppedDay) {
-      return <Text style={styles.dayQuantityOuter}>-</Text>
+      return <Text style={[styles.dayQuantityOuter, qtySize]}>-</Text>
     }
     if (item.requestType === 'SKIP' && item.isSkipped) {
-      return <Text style={styles.dayQuantitySkipped}>{item.quantity}</Text>
+      return <Text style={[styles.dayQuantitySkipped, qtySize]}>{item.quantity}</Text>
     }
     if (!item.isDelivered) {
-      return <Text style={styles.dayQuantityPending}>{item.quantity}</Text>
+      return <Text style={[styles.dayQuantityPending, qtySize]}>{item.quantity}</Text>
     }
-    return <Text style={styles.dayQuantityActive}>{item.quantity}</Text>
+    return <Text style={[styles.dayQuantityActive, qtySize]}>{item.quantity}</Text>
   }
 
   const renderCell = ({ item }: { item: CalendarDayType }) => {
+    const daySize = { fontSize: rf(12) }
     if (!item.isCurrentMonth || item.isBeforeStart || item.isStoppedDay) {
       return (
         <View style={getDayStyle(item)}>
-          <Text style={getDayTextStyle(item)}>{item.dayNumber}</Text>
+          <Text style={[getDayTextStyle(item), daySize]}>{item.dayNumber}</Text>
           {renderDayQuantity(item)}
         </View>
       )
@@ -181,7 +187,7 @@ export default function VendorSubscriptionCalendarScreen() {
           }
         }}
       >
-        <Text style={getDayTextStyle(item)}>{item.dayNumber}</Text>
+        <Text style={[getDayTextStyle(item), daySize]}>{item.dayNumber}</Text>
         {renderDayQuantity(item)}
       </TouchableOpacity>
     )
@@ -189,7 +195,7 @@ export default function VendorSubscriptionCalendarScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingHorizontal: gutter }]}>
         <View style={styles.headerTopRow}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Text style={styles.backButtonText}>‹</Text>
@@ -212,7 +218,11 @@ export default function VendorSubscriptionCalendarScreen() {
         </View>
       </View>
 
-      <View style={styles.calendarContainer}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingHorizontal: gutter, maxWidth: isTablet ? 680 : 520, width: '100%', alignSelf: 'center' }]}
+        showsVerticalScrollIndicator={false}
+      >
+      <View style={[styles.calendarContainer, { marginHorizontal: 0 }]}>
         <View style={styles.weekRow}>
           {WEEK_DAYS.map((day) => (
             <View key={day} style={styles.weekCell}>
@@ -232,6 +242,7 @@ export default function VendorSubscriptionCalendarScreen() {
             keyExtractor={(item) => item.date}
             renderItem={renderCell}
             numColumns={7}
+            scrollEnabled={false}
             contentContainerStyle={styles.calendarGrid}
             showsVerticalScrollIndicator={false}
             removeClippedSubviews={false}
@@ -244,22 +255,22 @@ export default function VendorSubscriptionCalendarScreen() {
         )}
       </View>
 
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
+      <View style={[styles.statsRow, { marginHorizontal: 0 }]}>
+        <View style={[styles.statItem, { minWidth: ms(90) }]}>
           <Text style={styles.statLabel}>Monthly Delivered Qty</Text>
           <Text style={styles.statValue}>{monthStats.monthlyDeliveredQuantity}</Text>
         </View>
-        <View style={styles.statItem}>
+        <View style={[styles.statItem, { minWidth: ms(90) }]}>
           <Text style={styles.statLabel}>Received Days</Text>
           <Text style={styles.statValue}>{monthStats.deliveredDays}</Text>
         </View>
-        <View style={styles.statItem}>
+        <View style={[styles.statItem, { minWidth: ms(90) }]}>
           <Text style={styles.statLabel}>Skipped Days</Text>
           <Text style={styles.statValue}>{monthStats.skippedDays}</Text>
         </View>
       </View>
 
-      <View style={styles.legendRow}>
+      <View style={[styles.legendRow, { marginHorizontal: 0 }]}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: '#DCFCE7' }]} />
           <Text style={styles.legendText}>Delivered</Text>
@@ -277,6 +288,7 @@ export default function VendorSubscriptionCalendarScreen() {
           <Text style={styles.legendText}>Upcoming</Text>
         </View>
       </View>
+      </ScrollView>
     </SafeAreaView>
   )
 }
@@ -350,22 +362,25 @@ const styles = StyleSheet.create({
   },
 
   calendarContainer: {
-    flex: 1,
-    marginHorizontal: 20,
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#EEF1F8',
-    padding: 12
+    padding: 12,
+    ...SHADOWS.card,
   },
   weekRow: { flexDirection: 'row', marginBottom: 8 },
   weekCell: { flex: 1, alignItems: 'center', paddingVertical: 8 },
   weekText: { fontSize: 13, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.3 },
 
+  scrollContent: {
+    paddingBottom: 16,
+    gap: 0,
+  },
   calendarGrid: { paddingBottom: 12 },
   calendarRow: { flexDirection: 'row' },
   calendarCell: {
-    width: '13.28%',
+    width: '13.2%',
     aspectRatio: 1,
     margin: 2,
     borderRadius: 12,

@@ -21,6 +21,17 @@ interface ReportData {
   deliveries: DeliveryItem[];
 }
 
+function formatReportDate(isoDate: string): string {
+  const d = new Date(`${isoDate}T00:00:00`);
+  if (isNaN(d.getTime())) return isoDate;
+  return d.toLocaleDateString('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
 function formatDateTime(date: Date): string {
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
@@ -110,6 +121,50 @@ function fitText(value: string, maxLength: number): string {
   return `${text.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
 }
 
+// Wraps text into as many lines as needed so nothing is truncated — the
+// address column especially must always show in full, never "…".
+function wrapLines(value: string, font: any, size: number, maxWidth: number): string[] {
+  const clean = sanitizePdfText(value || "").trim();
+  if (!clean) return ["-"];
+  const words = clean.split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+  const pushWord = (word: string) => {
+    // Hard-break a single word that is wider than the column itself
+    // (e.g. a long phone number or house code with no spaces).
+    let w = word;
+    while (w && font.widthOfTextAtSize(w, size) > maxWidth) {
+      let k = w.length - 1;
+      while (k > 1 && font.widthOfTextAtSize(w.slice(0, k), size) > maxWidth) k--;
+      if (current) {
+        lines.push(current);
+        current = "";
+      }
+      lines.push(w.slice(0, k));
+      w = w.slice(k);
+    }
+    const test = current ? `${current} ${w}` : w;
+    if (font.widthOfTextAtSize(test, size) <= maxWidth) {
+      current = test;
+    } else {
+      if (current) lines.push(current);
+      current = w;
+    }
+  };
+  for (const word of words) pushWord(word);
+  if (current) lines.push(current);
+  return lines.length > 0 ? lines : ["-"];
+}
+
+// Column widths sum to CONTENT_WIDTH (567). Address gets the widest share
+// so full delivery addresses fit without overflow.
+const TABLE_COL_WIDTHS = [92, 62, 148, 72, 48, 145];
+const TABLE_HEADERS = ['Customer', 'Phone', 'Address', 'Product', 'Qty', 'Request'];
+const CELL_FONT_SIZE = 8;
+const CELL_LINE_HEIGHT = 10;
+const CELL_PAD_Y = 5;
+const CELL_PAD_X = 3;
+
 export async function generateAndDownloadReport(report: ReportData): Promise<void> {
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -128,7 +183,7 @@ export async function generateAndDownloadReport(report: ReportData): Promise<voi
       color: rgb(0.94, 0.95, 0.98),
       thickness: 2,
     });
-    yPosition -= 6;
+    yPosition -= 8;
 
     drawCenteredText(
       page,
@@ -139,7 +194,19 @@ export async function generateAndDownloadReport(report: ReportData): Promise<voi
       20,
       rgb(0.06, 0.09, 0.17)
     );
-    yPosition -= 7;
+    yPosition -= 17;
+
+    const subtitle = `${formatReportDate(report.reportDate)}  •  ${report.totalDeliveries} ${report.totalDeliveries === 1 ? "delivery" : "deliveries"}  •  ${report.totalQuantity} units`;
+    drawCenteredText(
+      page,
+      subtitle,
+      PAGE_WIDTH / 2,
+      yPosition,
+      font,
+      9,
+      rgb(0.39, 0.45, 0.55)
+    );
+    yPosition -= 10;
 
     page.drawLine({
       start: { x: MARGIN_LEFT, y: yPosition },
@@ -147,7 +214,7 @@ export async function generateAndDownloadReport(report: ReportData): Promise<voi
       color: rgb(0.31, 0.27, 0.89),
       thickness: 0.8,
     });
-    yPosition -= 8;
+    yPosition -= 10;
   };
 
   const drawFooter = () => {
@@ -172,69 +239,50 @@ export async function generateAndDownloadReport(report: ReportData): Promise<voi
 
   const drawSummaryStats = () => {
     const statWidth = CONTENT_WIDTH / 2 - 4;
-    const statHeight = 18;
+    const statHeight = 56;
 
-    page.drawRectangle({
-      x: MARGIN_LEFT,
-      y: yPosition - statHeight,
-      width: statWidth,
-      height: statHeight,
-      borderColor: rgb(0.89, 0.91, 0.94),
-      borderWidth: 1,
-      color: rgb(0.94, 0.95, 0.98),
-    });
+    const drawStat = (x: number, value: string, label: string) => {
+      page.drawRectangle({
+        x,
+        y: yPosition - statHeight,
+        width: statWidth,
+        height: statHeight,
+        borderColor: rgb(0.89, 0.91, 0.94),
+        borderWidth: 1,
+        color: rgb(0.96, 0.97, 0.99),
+      });
+      // Accent bar on top of each stat card
+      page.drawRectangle({
+        x,
+        y: yPosition - 4,
+        width: statWidth,
+        height: 4,
+        color: rgb(0.31, 0.27, 0.89),
+      });
+      drawCenteredText(
+        page,
+        String(value),
+        x + statWidth / 2,
+        yPosition - 30,
+        fontBold,
+        22,
+        rgb(0.31, 0.27, 0.89)
+      );
+      drawCenteredText(
+        page,
+        label,
+        x + statWidth / 2,
+        yPosition - 44,
+        font,
+        8,
+        rgb(0.39, 0.45, 0.55)
+      );
+    };
 
-    drawCenteredText(
-      page,
-      String(report.totalDeliveries),
-      MARGIN_LEFT + statWidth / 2,
-      yPosition - 12,
-      fontBold,
-      26,
-      rgb(0.31, 0.27, 0.89)
-    );
+    drawStat(MARGIN_LEFT, String(report.totalDeliveries), 'TOTAL DELIVERIES');
+    drawStat(MARGIN_LEFT + statWidth + 8, String(report.totalQuantity), 'TOTAL QUANTITY');
 
-    drawCenteredText(
-      page,
-      'TOTAL DELIVERIES',
-      MARGIN_LEFT + statWidth / 2,
-      yPosition - 20,
-      font,
-      9,
-      rgb(0.39, 0.45, 0.55)
-    );
-
-    page.drawRectangle({
-      x: MARGIN_LEFT + statWidth + 8,
-      y: yPosition - statHeight,
-      width: statWidth,
-      height: statHeight,
-      borderColor: rgb(0.89, 0.91, 0.94),
-      borderWidth: 1,
-      color: rgb(0.94, 0.95, 0.98),
-    });
-
-    drawCenteredText(
-      page,
-      report.totalQuantity,
-      MARGIN_LEFT + statWidth + 8 + statWidth / 2,
-      yPosition - 12,
-      fontBold,
-      26,
-      rgb(0.31, 0.27, 0.89)
-    );
-
-    drawCenteredText(
-      page,
-      'TOTAL QUANTITY',
-      MARGIN_LEFT + statWidth + 8 + statWidth / 2,
-      yPosition - 20,
-      font,
-      9,
-      rgb(0.39, 0.45, 0.55)
-    );
-
-    yPosition -= statHeight + 8;
+    yPosition -= statHeight + 10;
   };
 
   const drawTable = () => {
@@ -248,8 +296,8 @@ export async function generateAndDownloadReport(report: ReportData): Promise<voi
       });
       yPosition -= 8;
 
-      const colWidths = [110, 70, 130, 85, 45, 127];
-      const headers = ['Customer', 'Phone', 'Address', 'Product', 'Qty', 'Request'];
+      const colWidths = TABLE_COL_WIDTHS;
+      const headers = TABLE_HEADERS;
 
       page.drawRectangle({
         x: MARGIN_LEFT,
@@ -294,26 +342,69 @@ export async function generateAndDownloadReport(report: ReportData): Promise<voi
     yPosition -= 8;
 
     if (report.deliveries.length === 0) {
+      // Empty state: a bordered box with breathing room below the stat
+      // cards. yPosition only ever moves DOWN here (PDF origin is at the
+      // bottom-left), so nothing can overlap what was drawn above.
+      const boxHeight = 52;
+      const boxTop = yPosition - 6;
+      page.drawRectangle({
+        x: MARGIN_LEFT,
+        y: boxTop - boxHeight,
+        width: CONTENT_WIDTH,
+        height: boxHeight,
+        borderColor: rgb(0.89, 0.91, 0.94),
+        borderWidth: 1,
+        color: rgb(0.98, 0.99, 1.0),
+      });
       drawCenteredText(
         page,
         'No deliveries recorded for this date.',
         PAGE_WIDTH / 2,
-        yPosition + 10,
+        boxTop - 32,
         font,
         12,
-        rgb(0.58, 0.64, 0.72)
+        rgb(0.39, 0.45, 0.55)
       );
-      yPosition += 20;
+      yPosition = boxTop - boxHeight - 14;
       return;
     }
 
     let { colWidths, verticalLines } = drawTableHeader();
 
     report.deliveries.forEach((item, rowIndex) => {
-      // If a row would spill past the bottom margin, start a new page,
-      // redraw the report header, and redraw the table header so the
-      // columns keep lining up and don't appear to "disappear".
-      if (yPosition - TABLE_ROW_HEIGHT < MARGIN_BOTTOM) {
+      const isModified =
+        item.requestType === 'INCREASE' || item.requestType === 'DECREASE';
+      const qtyDisplay = isModified
+        ? `${item.baseQuantity} -> ${item.finalQuantity}*`
+        : item.finalQuantity;
+
+      let requestLabel = '-';
+      if (item.requestType) {
+        requestLabel = item.requestType;
+      }
+      const requestDetail = item.requestMessage
+        ? `${requestLabel}: ${item.requestMessage}`
+        : requestLabel;
+
+      // Wrap every cell to its column width so the full address (and every
+      // other field) is always visible — nothing is truncated or overflows.
+      const cellTexts = [
+        item.customerName || "-",
+        item.customerPhone || "-",
+        item.customerAddress || "-",
+        item.productName || "-",
+        qtyDisplay || "-",
+        requestDetail,
+      ];
+      const cellLines = cellTexts.map((text, col) =>
+        wrapLines(text, font, CELL_FONT_SIZE, colWidths[col] - CELL_PAD_X * 2)
+      );
+      const maxLines = Math.max(...cellLines.map((l) => l.length));
+      const rowHeight = maxLines * CELL_LINE_HEIGHT + CELL_PAD_Y * 2;
+
+      // If the full wrapped row would spill past the bottom margin, start a
+      // new page and redraw headers so columns keep lining up.
+      if (yPosition - rowHeight < MARGIN_BOTTOM) {
         drawFooter();
         page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
         pageNum++;
@@ -324,14 +415,14 @@ export async function generateAndDownloadReport(report: ReportData): Promise<voi
         verticalLines = headerState.verticalLines;
       }
 
-      const rowY = yPosition - TABLE_ROW_HEIGHT;
+      const rowY = yPosition - rowHeight;
 
       if (rowIndex % 2 === 1) {
         page.drawRectangle({
           x: MARGIN_LEFT,
           y: rowY,
           width: CONTENT_WIDTH,
-          height: TABLE_ROW_HEIGHT,
+          height: rowHeight,
           color: rgb(0.97, 0.98, 0.99),
         });
       }
@@ -340,46 +431,20 @@ export async function generateAndDownloadReport(report: ReportData): Promise<voi
         start: { x: MARGIN_LEFT, y: rowY },
         end: { x: PAGE_WIDTH - MARGIN_RIGHT, y: rowY },
         color: rgb(0.89, 0.91, 0.94),
-        thickness: 0.1,
+        thickness: 0.5,
       });
 
       for (const vl of verticalLines) {
         page.drawLine({
           start: { x: vl, y: rowY },
-          end: { x: vl, y: rowY + TABLE_ROW_HEIGHT },
+          end: { x: vl, y: rowY + rowHeight },
           color: rgb(0.89, 0.91, 0.94),
-          thickness: 0.1,
+          thickness: 0.5,
         });
       }
 
-      const isModified =
-        item.requestType === 'INCREASE' || item.requestType === 'DECREASE';
-      const qtyDisplay = isModified
-        ? `${item.baseQuantity}->${item.finalQuantity}*`
-        : item.finalQuantity;
-
-      let requestLabel = '\u2014';
-      if (item.requestType) {
-        requestLabel = item.requestType;
-      }
-      const requestDetail = item.requestMessage
-        ? `${requestLabel}: ${item.requestMessage}`
-        : requestLabel;
-
-      // Address and request text are the most likely to overflow their
-      // columns, so they're clamped to a length that fits the column width
-      // at 9pt before being drawn.
-      const rowData = [
-        fitText(item.customerName, 20),
-        fitText(item.customerPhone, 16),
-        fitText(item.customerAddress, 30),
-        fitText(item.productName, 18),
-        qtyDisplay,
-        fitText(requestDetail, 38),
-      ];
-
-      let cellX = MARGIN_LEFT + 3;
-      for (let col = 0; col < rowData.length; col++) {
+      let cellX = MARGIN_LEFT;
+      for (let col = 0; col < cellLines.length; col++) {
         const textColor =
           col === 4 && isModified
             ? rgb(0.31, 0.27, 0.89)
@@ -391,13 +456,30 @@ export async function generateAndDownloadReport(report: ReportData): Promise<voi
               )
               : rgb(0.06, 0.09, 0.17);
 
-        page.drawText(sanitizePdfText(rowData[col]), {
-          x: cellX,
-          y: rowY + 5,
-          size: 9,
-          font: font,
-          color: textColor,
-        });
+        const lines = cellLines[col];
+        for (let li = 0; li < lines.length; li++) {
+          const line = lines[li];
+          const baselineY = yPosition - CELL_PAD_Y - CELL_FONT_SIZE - li * CELL_LINE_HEIGHT;
+          if (col === 4) {
+            // Center the quantity inside its narrow column
+            const w = font.widthOfTextAtSize(line, CELL_FONT_SIZE);
+            page.drawText(line, {
+              x: cellX + (colWidths[col] - w) / 2,
+              y: baselineY,
+              size: CELL_FONT_SIZE,
+              font: isModified ? fontBold : font,
+              color: textColor,
+            });
+          } else {
+            page.drawText(line, {
+              x: cellX + CELL_PAD_X,
+              y: baselineY,
+              size: CELL_FONT_SIZE,
+              font,
+              color: textColor,
+            });
+          }
+        }
         cellX += colWidths[col];
       }
 
@@ -572,13 +654,15 @@ export async function generateAndDownloadReport(report: ReportData): Promise<voi
       color: rgb(0.89, 0.91, 0.94),
       thickness: 0.3,
     });
-    yPosition -= 5;
+    yPosition -= 12;
 
     drawCenteredText(
       page,
       sanitizePdfText(
-        '* Modified quantity shown for accepted increase/decrease requests  |  Generated on ' +
-        formatDateTime(new Date())
+        report.deliveries.length > 0
+          ? '* Modified quantity shown for accepted increase/decrease requests  |  Generated on ' +
+            formatDateTime(new Date())
+          : 'Generated on ' + formatDateTime(new Date())
       ),
       PAGE_WIDTH / 2,
       yPosition,

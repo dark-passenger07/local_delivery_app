@@ -13,16 +13,15 @@ import {
   Alert,
   Linking,
   Platform,
-  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useResponsive } from "../../utils/responsive";
+import { COLORS as TOKENS, SHADOWS } from "../../theme/tokens";
 import { Ionicons, MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 import { generateAndDownloadReport } from "../../utils/generateReportPDF";
 import { useCustomerSubscriptionStore, type SubscriptionHistoryItem } from "../../context/vendorContext/CustomerSubscriptionContex";
 import { useVendorContextStore } from "../../context/vendorContext/VendorContext";
 import { useProductStore } from "../../context/vendorContext/ProductContext";
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface ProductSubscription {
   subscriptionId: string
@@ -42,8 +41,8 @@ interface CustomerState {
 }
 
 const C = {
-  bg: "#F4F6FB", card: "#FFFFFF", ink: "#0F172A", inkSoft: "#475569", inkMuted: "#94A3B8",
-  primary: "#4F46E5", primarySoft: "#EEF2FF", addressBg: "#F6F8FC",
+  bg: TOKENS.bg, card: "#FFFFFF", ink: "#0F172A", inkSoft: "#475569", inkMuted: "#94A3B8",
+  primary: TOKENS.primary, primarySoft: "#EEF2FF", addressBg: "#F6F8FC",
   green: "#16A34A", greenSoft: "#DCFCE7",
   orange: "#F59E0B", orangeSoft: "#FEF3C7",
   blue: "#3B82F6", blueSoft: "#DBEAFE",
@@ -87,6 +86,8 @@ const formatPhone = (p: string) => {
 };
 
 export default function HomeScreen() {
+  const { width, isTablet, isLargeTablet, isSmallDevice, gutter, maxWidth, rf, ms } = useResponsive();
+  void width; void isLargeTablet; void maxWidth; void rf; void ms;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -334,7 +335,7 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
 
-      <View style={styles.headerContainer}>
+      <View style={[styles.headerContainer, { paddingHorizontal: gutter }]}>
         <Text style={styles.businessName}>{(vendorAccount as any)?.businessName}</Text>
         <View style={styles.headerRow}>
           <Text style={styles.hello}>Namaste 👋</Text>
@@ -361,7 +362,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <View style={styles.reportBar}>
+      <View style={[styles.reportBar, { paddingHorizontal: gutter }]}>
         <TouchableOpacity style={styles.reportButton} onPress={generateTodayReport} activeOpacity={0.85} disabled={reportLoading}>
           {reportLoading ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
@@ -384,7 +385,7 @@ export default function HomeScreen() {
           data={[]}
           renderItem={() => null}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[C.primary]} tintColor={C.primary} />}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[styles.listContainer, { paddingHorizontal: gutter, maxWidth: isTablet ? 860 : 600, width: "100%", alignSelf: "center" }]}
           ListEmptyComponent={
             <View style={styles.centerContainer}>
               <View style={styles.errorIconBox}><Feather name="alert-triangle" size={22} color={C.red} /></View>
@@ -398,7 +399,7 @@ export default function HomeScreen() {
           data={vendorCustomers}
           keyExtractor={(item) => item.id}
           renderItem={renderCustomerCard}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[styles.listContainer, { paddingHorizontal: gutter, maxWidth: isTablet ? 860 : 600, width: "100%", alignSelf: "center" }]}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             vendorCustomers.length > 0 ? (
@@ -486,9 +487,9 @@ function renderHistorySection(subscriptionHistory: SubscriptionHistoryItem[]) {
 }
 
 function StatChip({ icon, tone, value, label }: { icon: React.ReactNode; tone: string; value: string; label: string; }) {
-
+  const { isTablet, isSmallDevice } = useResponsive();
   return (
-    <View style={styles.statChip}>
+    <View style={[styles.statChip, { minWidth: isSmallDevice ? "100%" as const : isTablet ? "31%" as const : "30%" as const }]}>
       <View style={[styles.statIconWrap, { backgroundColor: tone }]}>{icon}</View>
       <View style={{ marginLeft: 10 }}>
         <Text style={styles.statValue}>{value}</Text>
@@ -518,7 +519,7 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: "row", gap: 8, marginBottom: 16, flexWrap: "wrap" },
   statChip: {
     flex: 1, minWidth: "30%", backgroundColor: C.card, borderRadius: 16, padding: 10, flexDirection: "row", alignItems: "center",
-    ...Platform.select({ ios: { shadowColor: "#0F172A", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10 }, android: { elevation: 1 } }),
+    ...SHADOWS.card,
   },
   statIconWrap: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   statValue: { fontSize: 15, fontWeight: "800", color: C.ink, lineHeight: 17 },
@@ -528,7 +529,7 @@ const styles = StyleSheet.create({
   listContainer: { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 4 },
   card: {
     backgroundColor: C.card, borderRadius: 22, padding: 14, marginBottom: 12, overflow: "hidden",
-    ...Platform.select({ ios: { shadowColor: "#0F172A", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16 }, android: { elevation: 2 } }),
+    ...SHADOWS.card,
   },
   cardTopRow: { flexDirection: "row", alignItems: "center" },
   cardInfo: { flex: 1, marginLeft: 12, minWidth: 0 },
@@ -575,7 +576,7 @@ const styles = StyleSheet.create({
   historyCard: {
     backgroundColor: C.card, borderRadius: 18, padding: 14, marginBottom: 12,
     borderWidth: 1, borderColor: "#F0E6D2",
-    ...Platform.select({ ios: { shadowColor: "#0F172A", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10 }, android: { elevation: 1 } }),
+    ...SHADOWS.card,
   },
   historyCardHeader: { flexDirection: "row", alignItems: "center" },
   historyAvatar: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.amberSoft, alignItems: "center", justifyContent: "center" },

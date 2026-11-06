@@ -4,8 +4,12 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCustomerVendorStore } from '../../context/customerContext/CustomerVendorContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useResponsive } from '../../utils/responsive';
+import { COLORS, SHADOWS } from '../../theme/tokens';
 
 export const VendorScreen = () => {
+  const { width, isTablet, isLargeTablet, isSmallDevice, gutter, maxWidth, rf, ms, columns } = useResponsive();
+  void isLargeTablet; void maxWidth; void columns; void width; void isSmallDevice;
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { getAllVendorProfile, vendorProfiles } = useCustomerVendorStore();
   const [loading, setLoading] = useState<boolean>(true);
@@ -61,17 +65,17 @@ export const VendorScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.center}>
-        <ActivityIndicator size="large" color="#6366F1" />
+      <SafeAreaView style={[styles.center, { backgroundColor: COLORS.bg }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading vendors…</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Vendors</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={['top', 'left', 'right']}>
+      <View style={[styles.header, { paddingHorizontal: gutter }]}>
+        <Text style={[styles.headerTitle, { fontSize: rf(26) }]}>My Vendors</Text>
         <Text style={styles.headerSubtitle}>
           {vendorProfiles.length} connected {vendorProfiles.length === 1 ? 'vendor' : 'vendors'}
         </Text>
@@ -80,18 +84,22 @@ export const VendorScreen = () => {
       <FlatList
         data={vendorProfiles}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        key={isTablet ? 't' : 'p'}
+        numColumns={isTablet ? 2 : 1}
+        columnWrapperStyle={isTablet ? { gap: ms(12) } : undefined}
+        style={{ width: '100%', maxWidth: isTablet ? 720 : 520, alignSelf: 'center' }}
+        contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter, paddingBottom: ms(24) }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#6366F1"
-            colors={['#6366F1']}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
           />
         }
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
+          <View style={[styles.emptyContainer, { marginTop: ms(60) }]}>
             <View style={styles.emptyIconCircle}>
               <Text style={styles.emptyIconText}>🏬</Text>
             </View>
@@ -103,9 +111,9 @@ export const VendorScreen = () => {
           <TouchableOpacity
             onPress={() => handleViewProducts(item.id)}
             activeOpacity={0.7}
-            style={styles.card}
+            style={[styles.card, SHADOWS.card, { padding: ms(16), flex: isTablet ? 1 : 0 }]}
           >
-            <View style={styles.avatarCircle}>
+            <View style={[styles.avatarCircle, { width: ms(44), height: ms(44), borderRadius: ms(22), backgroundColor: COLORS.primary }]}>
               <Text style={styles.avatarText}>{getInitials(item.businessName)}</Text>
             </View>
             <View style={styles.vendorInfo}>
@@ -128,17 +136,17 @@ export const VendorScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F6FA' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F6FA' },
+  container: { flex: 1, backgroundColor: '#F4F6FB' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F4F6FB' },
   loadingText: { marginTop: 12, color: '#6B7280', fontSize: 14, fontWeight: '500' },
 
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  headerTitle: { fontSize: 26, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 },
   headerSubtitle: { fontSize: 14, color: '#6B7280', marginTop: 2, fontWeight: '500' },
 
   listContent: { paddingHorizontal: 20, paddingBottom: 24, flexGrow: 1 },
 
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80, paddingHorizontal: 32 },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 60, paddingHorizontal: 32 },
   emptyIconCircle: {
     width: 72, height: 72, borderRadius: 36, backgroundColor: '#EEF0FB',
     alignItems: 'center', justifyContent: 'center', marginBottom: 16
@@ -163,12 +171,12 @@ const styles = StyleSheet.create({
     borderColor: '#F0F1F5'
   },
   avatarCircle: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#6366F1',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#2563EB',
     alignItems: 'center', justifyContent: 'center', marginRight: 12
   },
   avatarText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
   vendorInfo: { flex: 1 },
-  businessName: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  businessName: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
   businessPhone: { fontSize: 13, color: '#6B7280', marginTop: 2 },
 
   callButton: {

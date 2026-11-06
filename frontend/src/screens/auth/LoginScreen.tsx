@@ -6,17 +6,33 @@ import {
   StyleSheet,
   Alert,
   TouchableOpacity,
-  ActivityIndicator
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 // import { loginUser } from "../../api/auth.api";
 import { useAuthStore } from "../../context/vendorContext/AuthContext";
+import { useResponsive } from "../../utils/responsive";
+import { COLORS, SHADOWS } from "../../theme/tokens";
 
 export default function LoginScreen({ navigation }: any) {
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const { sendOtp } = useAuthStore()
+  const { sendOtp } = useAuthStore();
+  const { width, isTablet, isSmallDevice, gutter, maxWidth, rf, ms } =
+    useResponsive();
+
+  // Responsive metrics (referenced to keep hook values live on rotation)
+  const contentWidth = Math.min(maxWidth, width);
+  void contentWidth;
+  const iconSize = isSmallDevice ? ms(64) : ms(76);
+  const iconFontSize = rf(32);
+  const titleFontSize = isSmallDevice ? rf(24) : rf(28);
+  const subtitleFontSize = isSmallDevice ? rf(14) : rf(16);
+  const buttonHeight = isSmallDevice ? ms(52) : ms(56);
   const handleLogin = async () => {
     if (!phoneNumber.trim()) {
       Alert.alert("Missing Number", "Please type your phone number to continue.");
@@ -73,59 +89,102 @@ export default function LoginScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.formContainer}>
-        <View style={styles.iconCircle}>
-          <Text style={styles.iconText}>👋</Text>
-        </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: "center",
+            paddingHorizontal: gutter,
+            paddingVertical: ms(24),
+            maxWidth: isTablet ? 720 : 520,
+            width: "100%",
+            alignSelf: "center",
+          }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.formInner}>
+            <View
+              style={[
+                styles.iconCircle,
+                {
+                  width: iconSize,
+                  height: iconSize,
+                  borderRadius: iconSize / 2,
+                },
+              ]}
+            >
+              <Text style={[styles.iconText, { fontSize: iconFontSize }]}>👋</Text>
+            </View>
 
-        <Text style={styles.title}>Welcome Back</Text>
-        <Text style={styles.subtitle}>Enter your phone number to log in</Text>
+            <Text style={[styles.title, { fontSize: titleFontSize }]}>
+              Welcome Back
+            </Text>
+            <Text style={[styles.subtitle, { fontSize: subtitleFontSize }]}>
+              Enter your phone number to log in
+            </Text>
 
-        {/* Phone Number Input Field */}
-        <Text style={styles.label}>Your Phone Number</Text>
-        <View style={styles.inputRow}>
-          <View style={styles.countryCodeBox}>
-            <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
+            {/* Phone Number Input Field */}
+            <Text style={[styles.label, { fontSize: rf(15) }]}>
+              Your Phone Number
+            </Text>
+            <View style={styles.inputRow}>
+              <View style={styles.countryCodeBox}>
+                <Text style={[styles.countryCodeText, { fontSize: rf(15) }]}>
+                  +91
+                </Text>
+              </View>
+              <TextInput
+                style={[styles.input, { fontSize: rf(17), padding: ms(14) }]}
+                placeholder="10-digit number"
+                placeholderTextColor={COLORS.inkMuted}
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                keyboardType="phone-pad"
+                editable={!loading}
+                maxLength={15}
+              />
+            </View>
+            <Text style={styles.helperText}></Text>
+
+            {/* Custom Login Button with Loader */}
+            <TouchableOpacity
+              style={[
+                styles.primaryButton,
+                { height: buttonHeight },
+                loading && styles.disabledButton,
+              ]}
+              onPress={handleLogin}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={[styles.buttonText, { fontSize: rf(17) }]}>
+                  Log In
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            {/* Professional Navigation Link */}
+            <TouchableOpacity
+              style={styles.linkContainer}
+              onPress={() => !loading && navigation.navigate("Signup")}
+              disabled={loading}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.linkText, { fontSize: rf(15) }]}>
+                New here?{" "}
+                <Text style={styles.linkHighlight}>Create an account</Text>
+              </Text>
+            </TouchableOpacity>
           </View>
-          <TextInput
-            style={styles.input}
-            placeholder="10-digit number"
-            placeholderTextColor="#94A3B8"
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
-            keyboardType="phone-pad"
-            editable={!loading}
-            maxLength={15}
-          />
-        </View>
-        <Text style={styles.helperText}></Text>
-
-        {/* Custom Login Button with Loader */}
-        <TouchableOpacity
-          style={[styles.primaryButton, loading && styles.disabledButton]}
-          onPress={handleLogin}
-          disabled={loading}
-          activeOpacity={0.85}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Send OTP</Text>
-          )}
-        </TouchableOpacity>
-
-        {/* Professional Navigation Link */}
-        <TouchableOpacity
-          style={styles.linkContainer}
-          onPress={() => !loading && navigation.navigate("Signup")}
-          disabled={loading}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.linkText}>
-            New here? <Text style={styles.linkHighlight}>Create an account</Text>
-          </Text>
-        </TouchableOpacity>
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -133,43 +192,35 @@ export default function LoginScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F4F6FB",
+    backgroundColor: COLORS.bg,
   },
-  formContainer: {
-    flex: 1,
-    padding: 24,
-    justifyContent: "center",
+  formInner: {
+    width: "100%",
   },
   iconCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: "#E7ECFB",
+    backgroundColor: COLORS.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "center",
     marginBottom: 18,
   },
   iconText: {
-    fontSize: 34,
+    fontWeight: "700",
   },
   title: {
-    fontSize: 28,
     fontWeight: "800",
     marginBottom: 6,
     textAlign: "center",
-    color: "#0F172A",
+    color: COLORS.ink,
     letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 16,
     fontWeight: "500",
-    color: "#475569",
+    color: COLORS.inkSoft,
     textAlign: "center",
     marginBottom: 36,
   },
   label: {
-    fontSize: 16,
     fontWeight: "800",
     marginBottom: 10,
     color: "#1E293B",
@@ -180,57 +231,48 @@ const styles = StyleSheet.create({
   },
   countryCodeBox: {
     borderWidth: 1.5,
-    borderColor: "#E2E8F0",
+    borderColor: COLORS.border,
     borderRadius: 14,
     paddingHorizontal: 14,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: COLORS.inputBg,
     alignItems: "center",
     justifyContent: "center",
   },
   countryCodeText: {
-    fontSize: 16,
     fontWeight: "700",
-    color: "#0F172A",
+    color: COLORS.ink,
   },
   input: {
     flex: 1,
     borderWidth: 1.5,
-    borderColor: "#E2E8F0",
+    borderColor: COLORS.border,
     borderRadius: 14,
-    padding: 16,
-    fontSize: 18,
     fontWeight: "600",
-    backgroundColor: "#F8FAFC",
-    color: "#0F172A",
+    backgroundColor: COLORS.inputBg,
+    color: COLORS.ink,
     letterSpacing: 0.5,
   },
   helperText: {
     fontSize: 13,
-    color: "#94A3B8",
+    color: COLORS.inkMuted,
     fontWeight: "600",
     marginTop: 8,
     marginBottom: 24,
   },
   primaryButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: COLORS.primary,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    height: 56,
-    shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 3,
+    ...SHADOWS.button,
   },
   disabledButton: {
-    backgroundColor: "#93C5FD",
+    backgroundColor: COLORS.primaryMuted,
     shadowOpacity: 0,
     elevation: 0,
   },
   buttonText: {
     color: "#fff",
-    fontSize: 17,
     fontWeight: "800",
   },
   linkContainer: {
@@ -239,12 +281,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   linkText: {
-    color: "#475569",
-    fontSize: 16,
+    color: COLORS.inkSoft,
     fontWeight: "600",
   },
   linkHighlight: {
-    color: "#2563EB",
+    color: COLORS.primary,
     fontWeight: "800",
   },
 });

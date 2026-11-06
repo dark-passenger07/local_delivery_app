@@ -19,6 +19,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Feather } from '@expo/vector-icons'
 import { useProductStore } from '../../context/vendorContext/ProductContext'
+import { useResponsive } from '../../utils/responsive'
+import { SHADOWS } from '../../theme/tokens'
 import PriceHistoryModal, { ProductPriceHistoryEntry } from '../../components/PriceHistoryModal'
 
 // ---------------------------------------------------------------------------
@@ -28,11 +30,11 @@ import PriceHistoryModal, { ProductPriceHistoryEntry } from '../../components/Pr
 const SPACING = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 40 }
 
 const COLORS = {
-  background: '#FFFFFF',
-  surface: '#FAFAF8',
+  background: '#F4F6FB',
+  surface: '#FFFFFF',
   surfaceAlt: '#F1EFE8',
   border: '#EDEBE3',
-  primary: '#2F6FED',
+  primary: '#2563EB',
   primarySurface: '#E6F1FB',
   primaryText: '#0C447C',
   danger: '#A32D2D',
@@ -125,6 +127,8 @@ const ProductCard = ({ item, onEdit, onDelete, onHistory }: any) => {
 export const MyProductsScreen = () => {
   const { allProducts, getAllProducts, addProduct, updateProduct, removeProduct, getProductPriceHistory } = useProductStore()
   const insets = useSafeAreaInsets()
+  const { isTablet, gutter, maxWidth, rf, ms } = useResponsive()
+  void maxWidth; void rf;
 
   // Component Local States
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -302,7 +306,7 @@ export const MyProductsScreen = () => {
 
   // Reserve room at the bottom of the list so the FAB never sits on top of
   // the last card, and respect the device's safe-area inset.
-  const fabBottomOffset = insets.bottom + SPACING.lg
+  const fabBottomOffset = Math.max(insets.bottom, 16) + ms(20)
   const listBottomPadding = fabBottomOffset + 56 /* fab size */ + SPACING.lg
 
   const renderContent = () => {
@@ -333,10 +337,13 @@ export const MyProductsScreen = () => {
     return (
       <FlatList
         data={memoizedProducts}
+        key={isTablet ? 'two-col' : 'one-col'}
+        numColumns={isTablet ? 2 : 1}
+        columnWrapperStyle={isTablet ? { gap: 12 } : undefined}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: listBottomPadding },
+          { paddingBottom: listBottomPadding, paddingHorizontal: gutter, maxWidth: isTablet ? 860 : 720, width: '100%', alignSelf: 'center' },
           memoizedProducts.length === 0 && styles.listContentEmpty,
         ]}
         showsVerticalScrollIndicator={false}
@@ -369,7 +376,7 @@ export const MyProductsScreen = () => {
   return (
     <View style={[styles.container, { paddingTop: insets.top + SPACING.md }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingHorizontal: gutter, maxWidth: isTablet ? 860 : 720, width: '100%', alignSelf: 'center' }]}>
         <Text style={styles.headerTitle}>My products</Text>
         {memoizedProducts.length > 0 && (
           <View style={styles.headerBadge}>
@@ -381,7 +388,7 @@ export const MyProductsScreen = () => {
       {renderContent()}
 
       {/* Floating Action Button — anchored above safe area, clear of the list */}
-      <View style={[styles.fabWrapper, { bottom: fabBottomOffset }]}>
+      <View style={[styles.fabWrapper, { bottom: fabBottomOffset, right: gutter }]}>
         <TouchableOpacity
           activeOpacity={0.85}
           accessibilityRole="button"
@@ -412,7 +419,7 @@ export const MyProductsScreen = () => {
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.modalFlexEnd}>
               <TouchableWithoutFeedback>
-                <View style={[styles.modalContent, { maxHeight: '90%', paddingBottom: Math.max(insets.bottom + SPACING.md, SPACING.lg) }]}>
+                <View style={[styles.modalContent, { maxHeight: '90%', padding: ms(24), paddingTop: SPACING.sm, paddingBottom: Math.max(insets.bottom + SPACING.md, SPACING.lg) }]}>
                   <ScrollView
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
@@ -434,7 +441,7 @@ export const MyProductsScreen = () => {
 
                     <Text style={styles.inputLabel}>Product name</Text>
                     <TextInput
-                      style={styles.inputField}
+                      style={[styles.inputField, { minHeight: ms(48) }]}
                       placeholder="e.g. milk, water, newspaper..."
                       placeholderTextColor={COLORS.textTertiary}
                       value={productName}
@@ -479,7 +486,7 @@ export const MyProductsScreen = () => {
 
                     <Text style={styles.inputLabel}>Price per {unit.toLowerCase()} (₹)</Text>
                     <TextInput
-                      style={styles.inputField}
+                      style={[styles.inputField, { minHeight: ms(48) }]}
                       placeholder="e.g. 30"
                       placeholderTextColor={COLORS.textTertiary}
                       value={price}
@@ -535,7 +542,7 @@ export const MyProductsScreen = () => {
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.modalFlexEnd}>
               <TouchableWithoutFeedback>
-                <View style={[styles.modalContent, { maxHeight: '90%', paddingBottom: Math.max(insets.bottom + SPACING.md, SPACING.lg) }]}>
+                <View style={[styles.modalContent, { maxHeight: '90%', padding: ms(24), paddingTop: SPACING.sm, paddingBottom: Math.max(insets.bottom + SPACING.md, SPACING.lg) }]}>
                   <ScrollView
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
@@ -561,7 +568,7 @@ export const MyProductsScreen = () => {
                       Price per {String(editingProduct?.unit || 'unit').toLowerCase()} (₹)
                     </Text>
                     <TextInput
-                      style={styles.inputField}
+                      style={[styles.inputField, { minHeight: ms(48) }]}
                       placeholder="e.g. 30"
                       placeholderTextColor={COLORS.textTertiary}
                       value={editPrice}
@@ -713,6 +720,7 @@ const styles = StyleSheet.create({
 
   // Product card
   productCard: {
+    flex: 1,
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
@@ -721,6 +729,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     borderWidth: 1,
     borderColor: COLORS.border,
+    ...SHADOWS.card,
   },
   productIcon: {
     width: 44,
@@ -814,7 +823,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
+    ...SHADOWS.button,
   },
 
   // Modal

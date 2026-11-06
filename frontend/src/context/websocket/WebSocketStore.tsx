@@ -108,6 +108,15 @@ export const useSocketStore = create<SocketStore>()((set, get) => ({
       useRequestStore.getState().getNewRequest(mappedRequest)
     })
 
+    // when a customer cancels a pending request remove it everywhere instantly
+    socket.on("request_cancelled", (data: { requestId?: string } | string) => {
+      const requestId = typeof data === "string" ? data : data?.requestId
+      if (!requestId) return
+
+      useRequestStore.getState().removeCustomerRequest(requestId)
+      useCustomerHomeContext.getState().removeRequestDetails(requestId)
+    })
+
     // update the customer when vendor deletes their product
     socket.on("update_vendor_product", (data) => {
       const { action, productId } = data;
@@ -136,6 +145,14 @@ export const useSocketStore = create<SocketStore>()((set, get) => ({
       }))
       // keep the vendor's subscription history section in sync
       useCustomerSubscriptionStore.getState().fetchVendorSubscriptionHistory().catch(() => {})
+      // pending requests for the stopped service were auto-rejected — refresh
+      // the vendor's request list so they leave the "New" tab
+      useRequestStore.getState().getCustomerRequests().catch(() => {})
+    })
+
+    // pending requests auto-rejected because the customer unsubscribed
+    socket.on("requests_auto_rejected", () => {
+      useRequestStore.getState().getCustomerRequests().catch(() => {})
     })
 
     // when vendor adds a customer 
@@ -169,11 +186,13 @@ export const useSocketStore = create<SocketStore>()((set, get) => ({
       socket.off("connect");
       socket.off("connect_error");
       socket.off("new_request_created");
+      socket.off("request_cancelled");
       socket.off("Updated_Product_response");
       socket.off("vendor_update_response");
       socket.off("update_vendor_product");
       socket.off("customer_subscribed_product");
       socket.off("customer_unsubcribed_product");
+      socket.off("requests_auto_rejected");
       socket.off("vendor_added_customer");
       socket.off("customer_removed");
 

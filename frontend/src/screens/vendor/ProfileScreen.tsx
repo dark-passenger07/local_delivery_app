@@ -21,14 +21,16 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuthStore } from '../../context/vendorContext/AuthContext';
 import { useVendorContextStore } from '../../context/vendorContext/VendorContext';
 import { pickImage, type PickedImage } from '../../utils/pickImage';
+import { useResponsive } from '../../utils/responsive';
+import { SHADOWS } from '../../theme/tokens';
 
 const COLORS = {
   background: '#FFFFFF',
-  page: '#FAFAF8',
-  surface: '#FAFAF8',
+  page: '#F4F6FB',
+  surface: '#FFFFFF',
   surfaceAlt: '#F1EFE8',
   border: '#EDEBE3',
-  primary: '#2F6FED',
+  primary: '#2563EB',
   primarySurface: '#E6F1FB',
   primaryText: '#0C447C',
   danger: '#A32D2D',
@@ -41,6 +43,8 @@ const COLORS = {
 const ProfileScreen = () => {
   const { logout } = useAuthStore();
   const insets = useSafeAreaInsets();
+  const { isTablet, gutter, ms } = useResponsive();
+  const avatarSize = ms(92);
   // Destructure vendorAccount from your store
   const { vendorProfileDetails, updateVendorProfile, uploadVendorImage } = useVendorContextStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
@@ -158,19 +162,19 @@ const ProfileScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.page} />
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingHorizontal: gutter, maxWidth: isTablet ? 720 : 520, width: '100%', alignSelf: 'center' }]} showsVerticalScrollIndicator={false}>
 
         {/* Header Avatar Section */}
-        <View style={styles.headerSection}>
+        <View style={[styles.headerSection, { marginTop: ms(24) }]}>
           <TouchableOpacity
-            style={styles.avatarContainer}
+            style={[styles.avatarContainer, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]}
             onPress={openEdit}
             activeOpacity={0.85}
             accessibilityRole="button"
             accessibilityLabel="Edit profile photo"
           >
             {profile?.image ? (
-              <Image source={{ uri: profile.image }} style={styles.avatarImage} />
+              <Image source={{ uri: profile.image }} style={[styles.avatarImage, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]} />
             ) : (
               <Text style={styles.avatarText}>{avatarLetter}</Text>
             )}
@@ -484,6 +488,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
+    ...SHADOWS.card,
   },
   cardTitle: {
     fontSize: 15,
@@ -536,6 +541,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
+    ...SHADOWS.card,
   },
   revenueIcon: {
     width: 40,
@@ -568,6 +574,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 16,
     marginTop: 8,
+    ...SHADOWS.card,
   },
   logoutButtonText: {
     color: COLORS.danger,
@@ -722,6 +729,7 @@ const styles = StyleSheet.create({
   },
   modalSaveButton: {
     backgroundColor: COLORS.primary,
+    ...SHADOWS.button,
   },
   modalSaveDisabled: {
     backgroundColor: '#93C5FD',

@@ -20,6 +20,9 @@ import { useCustomerHomeContext } from '../../context/customerContext/CustomerHo
 import PriceHistoryModal, { ProductPriceHistoryEntry } from '../../components/PriceHistoryModal';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
+import { ScrollView } from 'react-native';
+import { useResponsive } from '../../utils/responsive';
+import { COLORS, SHADOWS } from '../../theme/tokens';
 
 type ProductScreenRouteParams = {
   ProductScreen: {
@@ -28,6 +31,8 @@ type ProductScreenRouteParams = {
 }
 
 const ProductScreen = () => {
+  const { width, isTablet, isLargeTablet, isSmallDevice, gutter, maxWidth, rf, ms, columns } = useResponsive();
+  void isLargeTablet; void maxWidth; void columns; void isSmallDevice;
   const route = useRoute<RouteProp<ProductScreenRouteParams, 'ProductScreen'>>();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { vendorId } = route.params;
@@ -41,7 +46,7 @@ const ProductScreen = () => {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [subscribing, setSubscribing] = useState<boolean>(false);
   const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set());
-  const [dailyQuantity, setDailyQuantity] = useState('1');
+  const [dailyQuantity, setDailyQuantity] = useState('0');
   const [startDate, setStartDate] = useState('');
   const [startDateObj, setStartDateObj] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -105,16 +110,22 @@ const ProductScreen = () => {
     setShowDatePicker(true);
   };
 
+  const getTomorrow = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    return tomorrow;
+  };
+
   const onDateChange = (_event: DateTimePickerChangeEvent, selectedDate: Date) => {
     if (Platform.OS !== 'ios') {
       setShowDatePicker(false);
     }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const tomorrow = getTomorrow();
     const chosenDate = new Date(selectedDate);
     chosenDate.setHours(0, 0, 0, 0);
-    if (chosenDate < today) {
-      Alert.alert('Invalid Date', 'Please choose today or a future date.');
+    if (chosenDate < tomorrow) {
+      Alert.alert('Invalid Date', 'Subscriptions cannot start today. Please choose tomorrow or a future date.');
       return;
     }
     setStartDateObj(chosenDate);
@@ -126,6 +137,7 @@ const ProductScreen = () => {
 
   const initiateSubscriptionFlow = (productId: string) => {
     setSelectedProductId(productId);
+    setDailyQuantity('0');
     setStartDate('');
     setStartDateObj(null);
     setShowDatePicker(false);
@@ -206,23 +218,23 @@ const ProductScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.center}>
-        <ActivityIndicator size="large" color="#6366F1" />
+      <SafeAreaView style={[styles.center, { backgroundColor: COLORS.bg }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading products…</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} activeOpacity={0.7}>
+    <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={['top', 'left', 'right']}>
+      <View style={[styles.header, { paddingHorizontal: gutter }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { paddingHorizontal: ms(14), paddingVertical: ms(8) }]} activeOpacity={0.7}>
           <View style={styles.backButtonIconWrap}>
-            <Text style={styles.backButtonIcon}>←</Text>
+            <Text style={[styles.backButtonIcon, { color: COLORS.primary }]}>←</Text>
           </View>
-          <Text style={styles.backButtonText}>Vendors</Text>
+          <Text style={[styles.backButtonText, { color: COLORS.primary }]}>Vendors</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Products</Text>
+        <Text style={[styles.headerTitle, { fontSize: rf(26) }]}>Products</Text>
         <Text style={styles.headerSubtitle}>
           {vendorProducts.length} {vendorProducts.length === 1 ? 'product' : 'products'} available
         </Text>
@@ -231,7 +243,11 @@ const ProductScreen = () => {
       <FlatList
         data={vendorProducts}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        key={isTablet ? 't' : 'p'}
+        numColumns={isTablet ? 2 : 1}
+        columnWrapperStyle={isTablet ? { gap: ms(12) } : undefined}
+        style={{ width: '100%', maxWidth: isTablet ? 720 : 520, alignSelf: 'center' }}
+        contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter, paddingBottom: ms(24) }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -247,8 +263,8 @@ const ProductScreen = () => {
           const priceValue = Number(item.price) || 0;
           const unitLabel = String(item.unit || 'unit').toLowerCase();
           return (
-            <View style={styles.productCard}>
-              <View style={styles.avatarCircle}>
+            <View style={[styles.productCard, SHADOWS.card, { flex: isTablet ? 1 : 0 }]}>
+              <View style={[styles.avatarCircle, { width: ms(44), height: ms(44), borderRadius: ms(22), backgroundColor: COLORS.primary }]}>
                 <Text style={styles.avatarText}>{getInitials(item.productName)}</Text>
               </View>
               <View style={styles.productInfo}>
@@ -278,7 +294,7 @@ const ProductScreen = () => {
                 )}
               </View>
               <TouchableOpacity
-                style={[styles.subscribeButton, isSubscribed && styles.subscribedButton]}
+                style={[styles.subscribeButton, SHADOWS.button, { paddingVertical: ms(10), paddingHorizontal: ms(16) }, isSubscribed && styles.subscribedButton]}
                 onPress={() => initiateSubscriptionFlow(item.id)}
                 disabled={isSubscribed}
                 activeOpacity={0.85}
@@ -300,9 +316,15 @@ const ProductScreen = () => {
         onRequestClose={cancelSubscriptionFlow}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, SHADOWS.card, { width: '100%', maxWidth: Math.min(width * 0.92, isTablet ? 560 : 440), maxHeight: '90%' }]}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ alignItems: 'center', paddingBottom: ms(8) }}
+              style={{ width: '100%' }}
+              keyboardShouldPersistTaps="handled"
+            >
             <View style={styles.modalIconCircle}>
-              <Text style={styles.modalIconText}>✓</Text>
+              <Text style={[styles.modalIconText, { color: COLORS.primary }]}>✓</Text>
             </View>
             <Text style={styles.modalTitle}>Confirm Subscription</Text>
             <Text style={styles.modalMessage}>
@@ -310,13 +332,13 @@ const ProductScreen = () => {
                <Text style={styles.modalMessageBold}>{activeProduct?.productName}</Text>?
              </Text>
 
-             {activeProduct?.unit && (
-               <View style={styles.unitBadge}>
-                 <Text style={styles.unitText}>{activeProduct.unit}</Text>
-               </View>
-             )}
+              {activeProduct?.unit && (
+                <View style={styles.unitBadge}>
+                  <Text style={[styles.unitText, { color: COLORS.primary }]}>{activeProduct.unit}</Text>
+                </View>
+              )}
 
-             <View style={styles.formField}>
+              <View style={styles.formField}>
               <Text style={styles.formLabel}>Daily Quantity</Text>
               <TextInput
                 style={styles.formInput}
@@ -331,7 +353,7 @@ const ProductScreen = () => {
             <View style={styles.formField}>
               <Text style={styles.formLabel}>Price per unit</Text>
               <View style={styles.priceDisplay}>
-                <Text style={styles.priceDisplayText}>
+                <Text style={[styles.priceDisplayText, { color: COLORS.primary }]}>
                   {Number(activeProduct?.price) > 0
                     ? `₹${Number(activeProduct?.price).toFixed(2)}`
                     : 'Not set'}
@@ -347,7 +369,7 @@ const ProductScreen = () => {
 
             <View style={styles.formField}>
               <Text style={styles.formLabel}>Start Date</Text>
-              <TouchableOpacity style={styles.datePickerButton} onPress={openDatePicker} activeOpacity={0.8}>
+              <TouchableOpacity style={[styles.datePickerButton, { minHeight: ms(52) }]} onPress={openDatePicker} activeOpacity={0.8}>
                 <Text style={styles.datePickerIcon}>📅</Text>
                 <Text style={startDate ? styles.dateText : styles.placeholderText}>
                   {formatDateString(startDateObj)}
@@ -357,10 +379,10 @@ const ProductScreen = () => {
 
             {showDatePicker && (
               <DateTimePicker
-                value={startDateObj || new Date()}
+                value={startDateObj || getTomorrow()}
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                minimumDate={new Date()}
+                minimumDate={getTomorrow()}
                 onValueChange={onDateChange}
               />
             )}
@@ -376,7 +398,7 @@ const ProductScreen = () => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalButton, styles.confirmBtn]}
+                style={[styles.modalButton, styles.confirmBtn, SHADOWS.button]}
                 onPress={executeSubscription}
                 disabled={subscribing}
                 activeOpacity={0.85}
@@ -388,6 +410,7 @@ const ProductScreen = () => {
                 )}
               </TouchableOpacity>
             </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -406,8 +429,8 @@ const ProductScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F6FA' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F6FA' },
+  container: { flex: 1, backgroundColor: '#F4F6FB' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F4F6FB' },
   loadingText: { marginTop: 12, color: '#6B7280', fontSize: 14, fontWeight: '500' },
 
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, backgroundColor: '#FFFFFF' },
@@ -435,9 +458,9 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
-  backButtonIcon: { fontSize: 16, color: '#6366F1', fontWeight: '700' },
-  backButtonText: { color: '#6366F1', fontSize: 14, fontWeight: '700' },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  backButtonIcon: { fontSize: 16, color: '#2563EB', fontWeight: '700' },
+  backButtonText: { color: '#2563EB', fontSize: 14, fontWeight: '700' },
+  headerTitle: { fontSize: 26, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 },
   headerSubtitle: { fontSize: 14, color: '#6B7280', marginTop: 2, fontWeight: '500' },
 
   listContent: { paddingHorizontal: 20, paddingBottom: 24, flexGrow: 1 },
@@ -467,25 +490,25 @@ const styles = StyleSheet.create({
     borderColor: '#F0F1F5'
   },
   avatarCircle: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#6366F1',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#2563EB',
     alignItems: 'center', justifyContent: 'center', marginRight: 12
   },
   avatarText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
   productInfo: { flex: 1, paddingRight: 10 },
-  productName: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  productName: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
   productDescription: { fontSize: 13, color: '#6B7280', marginTop: 2, lineHeight: 18 },
-  productPrice: { fontSize: 14, fontWeight: '800', color: '#4F46E5', marginTop: 6 },
+  productPrice: { fontSize: 14, fontWeight: '800', color: '#2563EB', marginTop: 6 },
   productPriceUnit: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
   productPriceMissing: { fontSize: 12, fontWeight: '600', color: '#DC2626', marginTop: 6 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  priceHistoryHint: { fontSize: 11, fontWeight: '700', color: '#6366F1', marginTop: 6 },
+  priceHistoryHint: { fontSize: 11, fontWeight: '700', color: '#2563EB', marginTop: 6 },
 
   subscribeButton: {
-    backgroundColor: '#6366F1',
+    backgroundColor: '#2563EB',
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 10,
-    shadowColor: '#6366F1',
+    shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -513,7 +536,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     width: '100%',
-    maxWidth: 340,
+    maxWidth: 440,
     alignItems: 'center',
     shadowColor: '#111827',
     shadowOffset: { width: 0, height: 8 },
@@ -525,16 +548,16 @@ const styles = StyleSheet.create({
     width: 52, height: 52, borderRadius: 26, backgroundColor: '#EEF0FB',
     alignItems: 'center', justifyContent: 'center', marginBottom: 14
   },
-  modalIconText: { fontSize: 22, color: '#6366F1', fontWeight: '800' },
-  modalTitle: { fontSize: 19, fontWeight: '800', marginBottom: 8, color: '#111827' },
+  modalIconText: { fontSize: 22, color: '#2563EB', fontWeight: '800' },
+  modalTitle: { fontSize: 19, fontWeight: '800', marginBottom: 8, color: '#0F172A' },
   modalMessage: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 22, lineHeight: 21 },
-  modalMessageBold: { fontWeight: '700', color: '#111827' },
+  modalMessageBold: { fontWeight: '700', color: '#0F172A' },
   modalButtonContainer: { flexDirection: 'row', width: '100%', justifyContent: 'space-between', gap: 12 },
   modalButton: { flex: 1, paddingVertical: 13, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   cancelBtn: { borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' },
   confirmBtn: {
-    backgroundColor: '#6366F1',
-    shadowColor: '#6366F1',
+    backgroundColor: '#2563EB',
+    shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -551,7 +574,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     fontSize: 15,
-    color: '#111827',
+    color: '#0F172A',
     backgroundColor: '#F9FAFB'
   },
   datePickerButton: {
@@ -565,7 +588,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB'
   },
   datePickerIcon: { fontSize: 16 },
-  dateText: { fontSize: 15, color: '#111827', fontWeight: '700' },
+  dateText: { fontSize: 15, color: '#0F172A', fontWeight: '700' },
    placeholderText: { fontSize: 14, color: '#9CA3AF', fontWeight: '600' },
 
    priceHint: { fontSize: 12, color: '#6B7280', marginTop: 6, lineHeight: 16 },
@@ -581,7 +604,7 @@ const styles = StyleSheet.create({
      paddingVertical: 12,
      backgroundColor: '#F3F4FF',
    },
-   priceDisplayText: { fontSize: 18, fontWeight: '800', color: '#4F46E5' },
+   priceDisplayText: { fontSize: 18, fontWeight: '800', color: '#2563EB' },
    priceDisplayUnit: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
 
    unitBadge: {
@@ -593,7 +616,7 @@ const styles = StyleSheet.create({
      marginBottom: 16,
      marginTop: 4
    },
-   unitText: { fontSize: 13, fontWeight: '700', color: '#6366F1' }
+   unitText: { fontSize: 13, fontWeight: '700', color: '#2563EB' }
  });
 
 export default ProductScreen;

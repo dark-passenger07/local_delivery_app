@@ -19,6 +19,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
 import { RouteProp } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
+import { useResponsive } from "../../utils/responsive";
+import { SHADOWS } from "../../theme/tokens";
 import { useCustomerSubscriptionStore, type VendorSubscribedProduct, type VendorSubscriptionStats, type PriceEffectiveFrom } from "../../context/vendorContext/CustomerSubscriptionContex";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
@@ -33,6 +35,7 @@ export default function CustomerSubscriptionsScreen() {
   const route = useRoute<RouteProp<RouteParams, 'CustomerSubscriptions'>>()
   const navigation = useNavigation<NativeStackNavigationProp<any>>()
   const { customerId, customerName } = route.params
+  const { isTablet, gutter, ms } = useResponsive()
   const { fetchCustomerSubscriptions, fetchVendorSubscriptionStats, deleteStoppedSubscription, updateSubscriptionPrice } = useCustomerSubscriptionStore()
 
   const [subscriptions, setSubscriptions] = useState<VendorSubscribedProduct[]>([])
@@ -291,15 +294,15 @@ export default function CustomerSubscriptionsScreen() {
         <View style={styles.divider} />
 
         <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
+          <View style={[styles.metaItem, { minWidth: isTablet ? '30%' : '47%' }]}>
             <Text style={styles.metaLabel}>Unit</Text>
             <Text style={styles.metaValue}>{item.product.unit}</Text>
           </View>
-          <View style={styles.metaItem}>
+          <View style={[styles.metaItem, { minWidth: isTablet ? '30%' : '47%' }]}>
             <Text style={styles.metaLabel}>Daily Qty</Text>
             <Text style={styles.metaValue}>{item.dailyQuantity}</Text>
           </View>
-          <View style={styles.metaItem}>
+          <View style={[styles.metaItem, { minWidth: isTablet ? '30%' : '47%' }]}>
             <Text style={styles.metaLabel}>Monthly Delivered Quantity</Text>
             <Text style={styles.metaValue}>
               {stats ? stats.monthlyDeliveredQuantity : '—'}
@@ -308,15 +311,15 @@ export default function CustomerSubscriptionsScreen() {
         </View>
 
         <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
+          <View style={[styles.metaItem, { minWidth: isTablet ? '30%' : '47%' }]}>
             <Text style={styles.metaLabel}>Started</Text>
             <Text style={styles.metaValue}>{formatDate(item.startDate)}</Text>
           </View>
-          <View style={styles.metaItem}>
+          <View style={[styles.metaItem, { minWidth: isTablet ? '30%' : '47%' }]}>
             <Text style={styles.metaLabel}>Received Days</Text>
             <Text style={styles.metaValue}>{stats ? stats.receivedDays : '—'}</Text>
           </View>
-          <View style={styles.metaItem}>
+          <View style={[styles.metaItem, { minWidth: isTablet ? '30%' : '47%' }]}>
             <Text style={styles.metaLabel}>Skipped Days</Text>
             <Text style={styles.metaValue}>{stats ? stats.skippedDays : '—'}</Text>
           </View>
@@ -324,33 +327,33 @@ export default function CustomerSubscriptionsScreen() {
 
         {isStopped && (
           <View style={styles.metaRow}>
-            <View style={styles.metaItem}>
+            <View style={[styles.metaItem, { minWidth: isTablet ? '30%' : '47%' }]}>
               <Text style={styles.metaLabel}>Stopped On</Text>
               <Text style={styles.metaValue}>{item.endDate ? formatDate(item.endDate) : '—'}</Text>
             </View>
-            <View style={styles.metaItem}>
+            <View style={[styles.metaItem, { minWidth: isTablet ? '30%' : '47%' }]}>
               <Text style={styles.metaLabel}>Days Used</Text>
               <Text style={styles.metaValue}>{getDaysUsed(item.startDate, item.endDate)}</Text>
             </View>
-            <View style={styles.metaItem}>
+            <View style={[styles.metaItem, { minWidth: isTablet ? '30%' : '47%' }]}>
               <Text style={styles.metaLabel}>Status</Text>
               <Text style={styles.metaValue}>Stopped</Text>
             </View>
           </View>
         )}
 
-        <View style={styles.revenueBanner}>
-          <View style={styles.revenueTile}>
+        <View style={[styles.revenueBanner, { flexWrap: 'wrap' }]}>
+          <View style={[styles.revenueTile, { minWidth: isTablet ? '30%' : '47%' }]}>
             <Text style={styles.revenueTileLabel}>Price / Unit</Text>
             <Text style={styles.revenueTileValue}>{formatCurrency(stats ? stats.price : item.price)}</Text>
           </View>
           <View style={styles.revenueDivider} />
-          <View style={styles.revenueTile}>
+          <View style={[styles.revenueTile, { minWidth: isTablet ? '30%' : '47%' }]}>
             <Text style={styles.revenueTileLabel}>This Month</Text>
             <Text style={styles.revenueTileValue}>{stats ? formatCurrency(stats.monthlyRevenue) : '—'}</Text>
           </View>
           <View style={styles.revenueDivider} />
-          <View style={styles.revenueTile}>
+          <View style={[styles.revenueTile, { minWidth: isTablet ? '30%' : '47%' }]}>
             <Text style={styles.revenueTileLabel}>Total</Text>
             <Text style={styles.revenueTileValueStrong}>{stats ? formatCurrency(stats.totalRevenue) : '—'}</Text>
           </View>
@@ -388,7 +391,7 @@ export default function CustomerSubscriptionsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingHorizontal: gutter }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -405,8 +408,11 @@ export default function CustomerSubscriptionsScreen() {
 
       <FlatList
         data={subscriptions}
+        key={isTablet ? 'two-col' : 'one-col'}
+        numColumns={isTablet ? 2 : 1}
+        columnWrapperStyle={isTablet ? { gap: 12 } : undefined}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter, maxWidth: isTablet ? 860 : 720, width: '100%', alignSelf: 'center' }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
@@ -432,7 +438,7 @@ export default function CustomerSubscriptionsScreen() {
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.modalCenterWrap}>
               <TouchableWithoutFeedback>
-                <View style={[styles.modalCard, { maxHeight: '90%' }]}>
+                <View style={[styles.modalCard, { maxHeight: '90%', padding: ms(20) }]}>
                   <ScrollView
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
@@ -591,12 +597,14 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   card: {
+    flex: 1,
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "#EEF1F8",
     padding: 16,
     marginBottom: 14,
+    ...SHADOWS.card,
   },
   stoppedCard: {
     backgroundColor: "#FAFAF9",
@@ -839,11 +847,13 @@ const styles = StyleSheet.create({
   },
   metaRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
     gap: 10,
   },
   metaItem: {
     flex: 1,
+    flexGrow: 1,
     backgroundColor: "#F8FAFC",
     borderRadius: 12,
     borderWidth: 1,

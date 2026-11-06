@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import {SafeAreaView} from "react-native-safe-area-context"
 import { useRequestStore, CustomerRequest, Status } from '../../context/vendorContext/RequestContext';
+import { useResponsive } from '../../utils/responsive';
+import { COLORS, SHADOWS } from '../../theme/tokens';
 
 const TABS = [
   { key: 'PENDING' as const, label: 'New', icon: '🕓' },
@@ -21,6 +23,8 @@ const TABS = [
 
 const RequestsScreen = () => {
   const { customerRequests, getCustomerRequests, updateRequest } = useRequestStore();
+  const { isTablet, gutter, maxWidth, rf, ms } = useResponsive();
+  void maxWidth;
 
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +103,7 @@ const RequestsScreen = () => {
     const isThisCardUpdating = updatingId === item.id;
 
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, { padding: ms(18) }]}>
         <View style={styles.userRow}>
           <View style={styles.avatarCircle}>
             <Text style={styles.avatarText}>{user.name?.charAt(0)?.toUpperCase() || "?"}</Text>
@@ -129,13 +133,13 @@ const RequestsScreen = () => {
           {(item.type === 'INCREASE' || item.type === 'DECREASE') && (
             <View style={styles.quantityRow}>
               {item.previousQuantity != null && (
-                <View style={styles.quantityBadge}>
+                <View style={[styles.quantityBadge, { minWidth: ms(100) }]}>
                   <Text style={styles.quantityLabel}>Previous Qty</Text>
                   <Text style={styles.quantityValue}>{item.previousQuantity}</Text>
                 </View>
               )}
               {item.requestedQuantity != null && (
-                <View style={[styles.quantityBadge, styles.requestedQuantityBadge]}>
+                <View style={[styles.quantityBadge, styles.requestedQuantityBadge, { minWidth: ms(100) }]}>
                   <Text style={styles.quantityLabel}>Requested Qty</Text>
                   <Text style={styles.quantityValue}>{item.requestedQuantity}</Text>
                 </View>
@@ -197,8 +201,8 @@ const RequestsScreen = () => {
   // Wrapped conditional states in SafeAreaView to maintain structural consistency
   if (loading && customerRequests.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.center}>
+      <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]}>
+        <View style={[styles.center, { marginTop: ms(48) }]}>
           <ActivityIndicator size="large" color="#2563EB" />
           <Text style={styles.loadingText}>Loading requests…</Text>
         </View>
@@ -208,8 +212,8 @@ const RequestsScreen = () => {
 
   if (error && customerRequests.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.center}>
+      <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]}>
+        <View style={[styles.center, { marginTop: ms(48) }]}>
           <Text style={styles.errorIcon}>⚠️</Text>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchRequests} activeOpacity={0.85}>
@@ -221,23 +225,23 @@ const RequestsScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingHorizontal: gutter }]}>
         <Text style={styles.headerTitle}>Requests</Text>
       </View>
 
       {/* Tab Navigation Menu */}
-       <View style={styles.tabBar}>
-         {TABS.map((tab) => (
-           <TouchableOpacity
-             key={tab.key}
-             style={[styles.tab, activeTab === tab.key && styles.activeTab]}
-             onPress={() => setActiveTab(tab.key)}
-             activeOpacity={0.8}
-           >
-             <Text style={styles.tabIcon}>{tab.icon}</Text>
-             <Text style={[styles.tabLabel, activeTab === tab.key && styles.activeTabLabel]}>
+       <View style={[styles.tabBar, { marginHorizontal: gutter }]}>
+          {TABS.map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tab, activeTab === tab.key && styles.activeTab]}
+              onPress={() => setActiveTab(tab.key)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.tabIcon}>{tab.icon}</Text>
+              <Text style={[styles.tabLabel, { fontSize: rf(11) }, activeTab === tab.key && styles.activeTabLabel]}>
                {tab.label}
              </Text>
              <View style={[styles.tabCount, activeTab === tab.key && styles.activeTabCount]}>
@@ -254,7 +258,7 @@ const RequestsScreen = () => {
         data={currentData}
         keyExtractor={(item) => item.id}
         renderItem={renderRequestItem}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={[styles.listContainer, { paddingHorizontal: gutter, maxWidth: isTablet ? 720 : 520, width: '100%', alignSelf: 'center' }]}
         refreshControl={
           <RefreshControl
             refreshing={loading}
@@ -264,7 +268,7 @@ const RequestsScreen = () => {
           />
         }
         ListEmptyComponent={
-          <View style={styles.center}>
+          <View style={[styles.center, { marginTop: ms(48) }]}>
             <Text style={styles.emptyIcon}>📭</Text>
             <Text style={styles.emptyText}>No {activeTab === 'PENDING' ? 'new' : activeTab.toLowerCase()} requests right now.</Text>
           </View>
@@ -395,11 +399,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 18,
     marginBottom: 16,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
+    ...SHADOWS.card,
     borderWidth: 1,
     borderColor: '#EEF1F8',
   },

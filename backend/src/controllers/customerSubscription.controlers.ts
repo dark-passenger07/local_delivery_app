@@ -59,6 +59,19 @@ export const subscribeProduct = async (req: Request, res: Response) => {
 
     const { dailyQuantity, startDate } = validateBody.data
 
+    // Subscriptions cannot start today — earliest allowed start is tomorrow.
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(0, 0, 0, 0)
+    const normalizedStart = new Date(startDate)
+    normalizedStart.setHours(0, 0, 0, 0)
+    if (normalizedStart < tomorrow) {
+      return res.status(400).json({
+        message: "Subscriptions cannot start today. Please choose tomorrow or a future date.",
+        success: false,
+      })
+    }
+
     // Price is a product attribute set by the vendor — the customer no longer
     // enters it. Snapshot the product's current price onto the subscription so
     // later edits to the product price don't change this customer's revenue.
@@ -251,6 +264,49 @@ export const unsubscribeProduct = async (req: Request, res: Response) => {
         endDate,
       },
     })
+
+    // Bug fix: any PENDING request for this product must not stay open after
+    // the customer unsubscribes — auto-reject them so neither side sees a
+    // stale "waiting" request for a stopped service.
+    const pendingRequests = await db.requests.findMany({
+      where: {
+        vendorCustomerId: vendorCustomer.id,
+        productId,
+        status: "PENDING",
+      },
+      select: { id: true },
+    })
+
+    if (pendingRequests.length > 0) {
+      await db.requests.updateMany({
+        where: {
+          vendorCustomerId: vendorCustomer.id,
+          productId,
+          status: "PENDING",
+        },
+        data: {
+          status: "REJECTED",
+          respondedAt: new Date(),
+        },
+      })
+
+      // Push the auto-rejected requests live so the customer's request list
+      // flips to "Rejected" instantly, and tell the vendor side to refresh.
+      const rejectedRequests = await db.requests.findMany({
+        where: { id: { in: pendingRequests.map((r) => r.id) } },
+        include: { product: { select: { productName: true } } },
+      })
+      for (const r of rejectedRequests) {
+        req.io.to(user.id).emit("vendor_update_response", {
+          ...r,
+          productName: r.product?.productName,
+        })
+      }
+      req.io.to(product.vendorId).emit("requests_auto_rejected", {
+        productId,
+        count: rejectedRequests.length,
+      })
+    }
 
     // Preserve a historical record of the completed/stopped subscription for the vendor.
     await db.subscriptionHistory.create({

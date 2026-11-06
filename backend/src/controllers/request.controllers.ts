@@ -3,6 +3,7 @@ import { z } from "zod"
 import { db } from "../libs/db.js"
 import type { Requests } from "../generated/zod/index.js"
 import { sendNotification } from "../services/notification.service.js"
+import { SubscriptionService } from "../services/subscription.service.js"
 
 const RequestSchema = z.object({
   type: z.enum(["SKIP", "INCREASE", "DECREASE"]),
@@ -26,6 +27,13 @@ export const customerRequest = async (req: Request, res: Response) => {
     }
 
     const { productId, message, type, start_date, end_date, requestedQuantity } = validateBody.data
+
+    if (start_date > end_date) {
+      return res.status(400).json({
+        message: "Start date cannot be after end date.",
+        success: false,
+      })
+    }
 
     const hourStr = new Intl.DateTimeFormat("en-US", {
       timeZone: "Asia/Kolkata",
@@ -84,11 +92,76 @@ export const customerRequest = async (req: Request, res: Response) => {
       })
     }
 
+    // Block any new request that overlaps a SKIP request which is still
+    // PENDING or already ACCEPTED for the same product. The blocked dates
+    // stay locked until the SKIP request is REJECTED by the vendor.
+    const blockingSkipRequest = await db.requests.findFirst({
+      where: {
+        vendorCustomerId: vendorCustomer.id,
+        productId: product.id,
+        type: "SKIP",
+        status: { in: ["PENDING", "ACCEPTED"] },
+        start_date: { lte: end_date },
+        end_date: { gte: start_date },
+      },
+      select: {
+        id: true,
+        status: true,
+        start_date: true,
+        end_date: true,
+      },
+    })
+
+    if (blockingSkipRequest) {
+      const fmt = (d: Date) => new Date(d).toLocaleDateString("en-IN")
+      return res.status(409).json({
+        message:
+          blockingSkipRequest.status === "PENDING"
+            ? `You already have a pending skip request (${fmt(blockingSkipRequest.start_date)} - ${fmt(blockingSkipRequest.end_date)}). You can't make another request on those days until the vendor rejects it.`
+            : `These days are already skipped (${fmt(blockingSkipRequest.start_date)} - ${fmt(blockingSkipRequest.end_date)}). You can't make another request on skipped days.`,
+        success: false,
+      })
+    }
+
+    const activeSubscription =
+      product.subscription?.[0] ??
+      (await db.customerSubscription.findFirst({
+        where: {
+          vendorCustomerId: vendorCustomer.id,
+          productId: product.id,
+          status: "ACTIVE",
+        },
+      }))
+
+    if (!activeSubscription) {
+      return res.status(404).json({
+        message: "No active subscription found for this product!",
+        success: false,
+      })
+    }
+
+    if (type === "DECREASE" && requestedQuantity !== null && requestedQuantity !== undefined) {
+      const currentQuantity = await SubscriptionService.getLowestEffectiveQuantityForRange(
+        vendorCustomer.id,
+        product.id,
+        activeSubscription.dailyQuantity.toString(),
+        start_date,
+        end_date
+      )
+
+      if (requestedQuantity > currentQuantity) {
+        return res.status(400).json({
+          message: `You can't decrease by more than your current quantity. Your current quantity for the selected dates is ${currentQuantity}.`,
+          success: false,
+        })
+      }
+    }
+
     const newRequest = await db.requests.create({
       data: {
         vendorCustomerId: vendorCustomer.id,
         productId: product.id,
-        subscriptionId: product.subscription[0].id,
+        subscriptionId: activeSubscription.id,
         message,
         start_date,
         end_date,
@@ -298,6 +371,88 @@ export const vendorResponse = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     console.log("Error updating the customer request: ", error.message)
+    return res.status(500).json({
+      message: "Internal Server Error",
+      success: false,
+    })
+  }
+}
+
+export const cancelCustomerRequest = async (req: Request, res: Response) => {
+  try {
+    const user = req.user
+    if (!user) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      })
+    }
+
+    const requestId = req.params.id as string
+    if (!requestId) {
+      return res.status(400).json({
+        message: "Request ID is required",
+        success: false,
+      })
+    }
+
+    const request = await db.requests.findUnique({
+      where: { id: requestId },
+      include: {
+        vendorCustomers: {
+          select: {
+            customerId: true,
+            vendorId: true,
+          },
+        },
+        product: {
+          select: {
+            productName: true,
+          },
+        },
+      },
+    })
+
+    if (!request) {
+      return res.status(404).json({
+        message: "Request not found",
+        success: false,
+      })
+    }
+
+    // A customer can only cancel their own request.
+    if (request.vendorCustomers.customerId !== user.id) {
+      return res.status(403).json({
+        message: "You are not allowed to cancel this request",
+        success: false,
+      })
+    }
+
+    // Once the vendor has responded, the request is no longer cancellable.
+    if (request.status !== "PENDING") {
+      return res.status(400).json({
+        message: "Only pending requests can be cancelled",
+        success: false,
+      })
+    }
+
+    await db.requests.delete({ where: { id: requestId } })
+
+    // Remove it from the vendor's list in real time.
+    req.io.to(request.vendorCustomers.vendorId).emit("request_cancelled", {
+      requestId,
+      productId: request.productId,
+      productName: request.product?.productName,
+      customerId: user.id,
+    })
+
+    return res.status(200).json({
+      message: "Request cancelled successfully!",
+      success: true,
+      requestId,
+    })
+  } catch (error: any) {
+    console.log("Error cancelling the customer request: ", error.message)
     return res.status(500).json({
       message: "Internal Server Error",
       success: false,

@@ -17,10 +17,21 @@ import { Feather } from '@expo/vector-icons';
 import { useAuthStore } from '../../context/vendorContext/AuthContext';
 import { useVendorContextStore } from '../../context/vendorContext/VendorContext';
 import { pickImage, type PickedImage } from '../../utils/pickImage';
+import { useResponsive } from '../../utils/responsive';
+import { COLORS, SHADOWS } from '../../theme/tokens';
 
 const VendorSetUpScreen = () => {
   const { logout } = useAuthStore();
   const { vendorProfile, uploadVendorImage } = useVendorContextStore();
+  const { width, isTablet, isSmallDevice, gutter, maxWidth, rf, ms } =
+    useResponsive();
+
+  const contentWidth = Math.min(maxWidth, width);
+  void contentWidth;
+  const titleFontSize = isSmallDevice ? rf(24) : rf(26);
+  const subtitleFontSize = isSmallDevice ? rf(14) : rf(16);
+  const previewHeight = isTablet ? 260 : 200;
+  const buttonHeight = isSmallDevice ? ms(52) : ms(56);
 
 
   // Form State
@@ -106,12 +117,24 @@ const VendorSetUpScreen = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: 'center',
+            paddingHorizontal: gutter,
+            paddingVertical: ms(24),
+            maxWidth: isTablet ? 720 : 520,
+            width: '100%',
+            alignSelf: 'center',
+          }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
 
           {/* Header Section */}
           <View style={styles.header}>
-            <Text style={styles.title}>Set Up Your Shop</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, { fontSize: titleFontSize }]}>Set Up Your Shop</Text>
+            <Text style={[styles.subtitle, { fontSize: subtitleFontSize }]}>
               Add your shop photo and two details, and you're ready to start taking orders.
             </Text>
           </View>
@@ -119,7 +142,7 @@ const VendorSetUpScreen = () => {
           {/* Shop photo upload box */}
           <View style={styles.uploadSection}>
             <View style={styles.uploadLabelRow}>
-              <Text style={styles.uploadLabel}>Shop Photo</Text>
+              <Text style={[styles.uploadLabel, { fontSize: rf(15) }]}>Shop Photo</Text>
               <View style={styles.optionalChip}>
                 <Text style={styles.optionalChipText}>OPTIONAL</Text>
               </View>
@@ -127,7 +150,11 @@ const VendorSetUpScreen = () => {
 
             {imageUri ? (
               <View style={styles.previewWrap}>
-                <Image source={{ uri: imageUri }} style={styles.previewImage} resizeMode="cover" />
+                <Image
+                  source={{ uri: imageUri }}
+                  style={[styles.previewImage, { height: previewHeight }]}
+                  resizeMode="cover"
+                />
                 <View style={styles.previewActions}>
                   <TouchableOpacity
                     style={styles.previewBtn}
@@ -137,7 +164,7 @@ const VendorSetUpScreen = () => {
                     accessibilityRole="button"
                     accessibilityLabel="Change shop photo"
                   >
-                    <Feather name="refresh-ccw" size={15} color="#2563EB" />
+                    <Feather name="refresh-ccw" size={15} color={COLORS.primary} />
                     <Text style={styles.previewBtnText}>Change</Text>
                   </TouchableOpacity>
                   <View style={styles.previewActionDivider} />
@@ -156,7 +183,7 @@ const VendorSetUpScreen = () => {
               </View>
             ) : (
               <TouchableOpacity
-                style={styles.uploadBox}
+                style={[styles.uploadBox, { paddingVertical: ms(28), paddingHorizontal: ms(20) }]}
                 onPress={handlePickImage}
                 activeOpacity={0.7}
                 disabled={isSubmitting}
@@ -164,13 +191,13 @@ const VendorSetUpScreen = () => {
                 accessibilityLabel="Upload shop photo"
               >
                 <View style={styles.uploadIconCircle}>
-                  <Feather name="image" size={26} color="#2563EB" />
+                  <Feather name="image" size={26} color={COLORS.primary} />
                 </View>
-                <Text style={styles.uploadBoxTitle}>Upload shop photo</Text>
-                <Text style={styles.uploadBoxHint}>Tap to choose a photo from your gallery</Text>
+                <Text style={[styles.uploadBoxTitle, { fontSize: rf(16) }]}>Upload shop photo</Text>
+                <Text style={[styles.uploadBoxHint, { fontSize: rf(13) }]}>Tap to choose a photo from your gallery</Text>
                 <View style={styles.uploadCta}>
-                  <Feather name="upload" size={14} color="#FFFFFF" />
-                  <Text style={styles.uploadCtaText}>Choose image</Text>
+                  <Feather name="upload" size={14} color={COLORS.card} />
+                  <Text style={[styles.uploadCtaText, { fontSize: rf(14) }]}>Choose image</Text>
                 </View>
               </TouchableOpacity>
             )}
@@ -186,11 +213,11 @@ const VendorSetUpScreen = () => {
               <Text style={styles.stepBadgeText}>1</Text>
             </View>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Shop / Business Name</Text>
+              <Text style={[styles.label, { fontSize: rf(15) }]}>Shop / Business Name</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { fontSize: rf(16), paddingHorizontal: ms(16), paddingVertical: ms(14) }]}
                 placeholder="e.g. Sharma General Store"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={COLORS.inkMuted}
                 value={businessName}
                 onChangeText={setBusinessName}
                 autoCapitalize="words"
@@ -203,11 +230,11 @@ const VendorSetUpScreen = () => {
               <Text style={styles.stepBadgeText}>2</Text>
             </View>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Business Phone Number</Text>
+              <Text style={[styles.label, { fontSize: rf(15) }]}>Business Phone Number</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { fontSize: rf(16), paddingHorizontal: ms(16), paddingVertical: ms(14) }]}
                 placeholder="e.g. 98765 43210"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={COLORS.inkMuted}
                 value={businessPhone}
                 onChangeText={setBusinessPhone}
                 keyboardType="phone-pad"
@@ -218,7 +245,7 @@ const VendorSetUpScreen = () => {
 
             {/* Action Buttons */}
             <TouchableOpacity
-              style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
+              style={[styles.primaryButton, { height: buttonHeight }, isSubmitting && styles.buttonDisabled]}
               onPress={handleCreateProfile}
               disabled={isSubmitting}
               activeOpacity={0.85}
@@ -226,7 +253,7 @@ const VendorSetUpScreen = () => {
               {isSubmitting ? (
                 <ActivityIndicator color="#ffffff" size="small" />
               ) : (
-                <Text style={styles.primaryButtonText}>Finish Setup</Text>
+                <Text style={[styles.primaryButtonText, { fontSize: rf(17) }]}>Finish Setup</Text>
               )}
             </TouchableOpacity>
 
@@ -236,7 +263,7 @@ const VendorSetUpScreen = () => {
               disabled={isSubmitting}
               activeOpacity={0.7}
             >
-              <Text style={styles.secondaryButtonText}>Log Out</Text>
+              <Text style={[styles.secondaryButtonText, { fontSize: rf(15) }]}>Log Out</Text>
             </TouchableOpacity>
           </View>
 
@@ -251,13 +278,7 @@ export default VendorSetUpScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F4F6FB',
-  },
-  scrollContainer: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-    justifyContent: 'center',
+    backgroundColor: COLORS.bg,
   },
   header: {
     marginBottom: 32,
@@ -274,7 +295,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   uploadLabel: {
-    fontSize: 16,
     fontWeight: '800',
     color: '#1E293B',
   },
@@ -287,7 +307,7 @@ const styles = StyleSheet.create({
   optionalChipText: {
     fontSize: 10.5,
     fontWeight: '800',
-    color: '#4F46E5',
+    color: COLORS.primary,
     letterSpacing: 0.4,
   },
   uploadBox: {
@@ -296,10 +316,9 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     borderRadius: 16,
     backgroundColor: '#F5F8FF',
-    paddingVertical: 28,
-    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    ...SHADOWS.card,
   },
   uploadIconCircle: {
     width: 56,
@@ -311,13 +330,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   uploadBoxTitle: {
-    fontSize: 16,
     fontWeight: '800',
     color: '#1E3A8A',
     marginBottom: 4,
   },
   uploadBoxHint: {
-    fontSize: 13,
     color: '#64748B',
     fontWeight: '500',
     textAlign: 'center',
@@ -327,32 +344,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#2563EB',
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 10,
   },
   uploadCtaText: {
-    color: '#FFFFFF',
-    fontSize: 14,
+    color: COLORS.card,
     fontWeight: '800',
   },
   previewWrap: {
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.card,
+    ...SHADOWS.card,
   },
   previewImage: {
     width: '100%',
-    height: 200,
     backgroundColor: '#E7ECFB',
   },
   previewActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.card,
   },
   previewBtn: {
     flex: 1,
@@ -365,7 +381,7 @@ const styles = StyleSheet.create({
   previewBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#2563EB',
+    color: COLORS.primary,
   },
   previewRemoveText: {
     color: '#DC2626',
@@ -373,26 +389,24 @@ const styles = StyleSheet.create({
   previewActionDivider: {
     width: 1,
     alignSelf: 'stretch',
-    backgroundColor: '#E2E8F0',
+    backgroundColor: COLORS.border,
   },
   uploadCaption: {
     fontSize: 12.5,
-    color: '#94A3B8',
+    color: COLORS.inkMuted,
     fontWeight: '500',
     marginTop: 10,
     textAlign: 'center',
   },
   title: {
-    fontSize: 26,
     fontWeight: '800',
-    color: '#0F172A',
+    color: COLORS.ink,
     marginBottom: 8,
     textAlign: 'center',
     letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#475569',
+    color: COLORS.inkSoft,
     lineHeight: 22,
     textAlign: 'center',
     fontWeight: '500',
@@ -404,13 +418,13 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#2563EB',
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
   },
   stepBadgeText: {
-    color: '#FFFFFF',
+    color: COLORS.card,
     fontSize: 14,
     fontWeight: '800',
   },
@@ -418,51 +432,41 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   label: {
-    fontSize: 16,
     fontWeight: '800',
     color: '#1E293B',
     marginBottom: 10,
   },
   input: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: COLORS.inputBg,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: COLORS.border,
     borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    fontSize: 16,
     fontWeight: '500',
-    color: '#0F172A',
+    color: COLORS.ink,
   },
   helperText: {
     fontSize: 13,
-    color: '#94A3B8',
+    color: COLORS.inkMuted,
     fontWeight: '600',
     marginTop: 8,
   },
   primaryButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: COLORS.primary,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 12,
-    height: 56,
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 3,
+    ...SHADOWS.button,
   },
   buttonDisabled: {
     opacity: 1,
-    backgroundColor: '#93C5FD',
+    backgroundColor: COLORS.primaryMuted,
     shadowOpacity: 0,
     elevation: 0,
   },
   primaryButtonText: {
     color: '#ffffff',
-    fontSize: 17,
     fontWeight: '800',
   },
   secondaryButton: {
@@ -473,7 +477,6 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: '#DC2626',
-    fontSize: 15,
     fontWeight: '700',
   },
 });

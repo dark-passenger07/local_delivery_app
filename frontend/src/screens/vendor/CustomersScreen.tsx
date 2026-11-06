@@ -9,16 +9,15 @@ import {
   TextInput,
   Alert,
   Linking,
-  Dimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
+import { useResponsive } from "../../utils/responsive";
+import { COLORS, SHADOWS } from "../../theme/tokens";
 import { useVendorCustomerStore } from "../../context/vendorContext/vendorCustomerContext";
 import { useCustomerSubscriptionStore } from "../../context/vendorContext/CustomerSubscriptionContex";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const AVATAR_COLORS = [
   { bg: "#E1F5EE", text: "#085041" },
@@ -41,6 +40,8 @@ const CustomerScreen = () => {
   const { addCustomer, deleteCustomers, allCustomers } =
     useVendorCustomerStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const insets = useSafeAreaInsets();
+  const { isTablet, gutter, ms } = useResponsive();
 
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -182,15 +183,15 @@ const CustomerScreen = () => {
   }, [search, customers, subscribedProducts]);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={["top", "left", "right"]}>
+      <View style={[styles.header, { paddingHorizontal: gutter }]}>
         <Text style={styles.headerTitle}>Customers</Text>
         <View style={styles.headerBadge}>
           <Text style={styles.headerBadgeText}>{customers.length}</Text>
         </View>
       </View>
 
-      <View style={styles.searchWrap}>
+      <View style={[styles.searchWrap, { marginHorizontal: gutter, height: ms(48) }]}>
         <Feather name="search" size={18} color="#9A9990" style={styles.searchIcon} />
         <TextInput
           placeholder="Search by name, phone, address"
@@ -298,7 +299,7 @@ const CustomerScreen = () => {
         stickySectionHeadersEnabled={false}
         refreshing={loading}
         onRefresh={fetchCustomers}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter, paddingBottom: ms(100), maxWidth: isTablet ? 860 : 720, width: "100%", alignSelf: "center" }]}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Feather name="users" size={32} color="#B4B2A9" />
@@ -308,7 +309,7 @@ const CustomerScreen = () => {
       />
 
       <TouchableOpacity
-        style={styles.fab}
+        style={[styles.fab, { right: gutter, bottom: Math.max(insets.bottom, 16) + ms(20) }]}
         onPress={() => setAddModalVisible(true)}
         accessibilityLabel="Add customer"
       >
@@ -467,11 +468,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 12,
     overflow: "hidden",
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    ...SHADOWS.card,
     borderWidth: 1,
     borderColor: "#F0F0EC",
   },

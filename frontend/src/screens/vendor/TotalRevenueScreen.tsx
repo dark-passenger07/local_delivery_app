@@ -16,9 +16,12 @@ import {
   useCustomerSubscriptionStore,
   type VendorRevenueItem,
 } from "../../context/vendorContext/CustomerSubscriptionContex";
+import { useResponsive } from "../../utils/responsive";
+import { SHADOWS } from "../../theme/tokens";
 
 export default function TotalRevenueScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const { isTablet, gutter, rf, ms } = useResponsive();
   const { totalRevenue, revenueItems, revenueLoading, fetchVendorTotalRevenue } =
     useCustomerSubscriptionStore();
   const [refreshing, setRefreshing] = useState(false);
@@ -65,7 +68,7 @@ export default function TotalRevenueScreen() {
   const renderItem = ({ item }: { item: VendorRevenueItem }) => {
     const isStopped = item.status === "STOPPED";
     return (
-      <View style={[styles.card, isStopped && styles.stoppedCard]}>
+      <View style={[styles.card, { flex: isTablet ? 1 : 0 }, isStopped && styles.stoppedCard]}>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleWrap}>
             <Text style={styles.productName} numberOfLines={1}>
@@ -88,17 +91,17 @@ export default function TotalRevenueScreen() {
         </View>
 
         <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
+          <View style={[styles.metaItem, { minWidth: isTablet ? '30%' : '47%' }]}>
             <Text style={styles.metaLabel}>Price / Unit</Text>
             <Text style={styles.metaValue}>{formatCurrency(item.price)}</Text>
           </View>
-          <View style={styles.metaItem}>
+          <View style={[styles.metaItem, { minWidth: isTablet ? '30%' : '47%' }]}>
             <Text style={styles.metaLabel}>Delivered</Text>
             <Text style={styles.metaValue}>
               {item.deliveredQuantity} {item.productUnit}
             </Text>
           </View>
-          <View style={styles.metaItem}>
+          <View style={[styles.metaItem, { minWidth: isTablet ? '30%' : '47%' }]}>
             <Text style={styles.metaLabel}>Since</Text>
             <Text style={styles.metaValue}>{formatDate(item.startDate)}</Text>
           </View>
@@ -141,7 +144,7 @@ export default function TotalRevenueScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingHorizontal: gutter }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Feather name="arrow-left" size={22} color="#1A1A18" />
         </TouchableOpacity>
@@ -153,15 +156,18 @@ export default function TotalRevenueScreen() {
 
       <FlatList
         data={revenueItems}
+        key={isTablet ? 'two-col' : 'one-col'}
+        numColumns={isTablet ? 2 : 1}
+        columnWrapperStyle={isTablet ? { gap: 12 } : undefined}
         keyExtractor={(item) => item.subscriptionId}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter, maxWidth: isTablet ? 860 : 720, width: '100%', alignSelf: 'center' }]}
         showsVerticalScrollIndicator={false}
         refreshing={refreshing}
         onRefresh={onRefresh}
         ListHeaderComponent={
-          <View style={styles.heroCard}>
+          <View style={[styles.heroCard, { padding: ms(22) }]}>
             <Text style={styles.heroLabel}>All-Time Revenue</Text>
-            <Text style={styles.heroAmount}>{formatCurrency(totalRevenue)}</Text>
+            <Text style={[styles.heroAmount, { fontSize: rf(38) }]} numberOfLines={1} adjustsFontSizeToFit>{formatCurrency(totalRevenue)}</Text>
             <Text style={styles.heroSub}>
               From {revenueItems.length} {revenueItems.length === 1 ? "subscription" : "subscriptions"}
             </Text>
@@ -274,6 +280,7 @@ const styles = StyleSheet.create({
     borderColor: "#EEF1F8",
     padding: 16,
     marginBottom: 14,
+    ...SHADOWS.card,
   },
   stoppedCard: {
     backgroundColor: "#FAFAF9",
@@ -349,12 +356,14 @@ const styles = StyleSheet.create({
   },
   metaRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
     gap: 10,
     marginTop: 14,
   },
   metaItem: {
     flex: 1,
+    flexGrow: 1,
     backgroundColor: "#F8FAFC",
     borderRadius: 12,
     borderWidth: 1,

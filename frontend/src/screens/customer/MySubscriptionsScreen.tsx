@@ -12,8 +12,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCustomerSubscriptionStore, type SubscriptionStatsType } from '../../context/customerContext/CustomerSubscriptionContext';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useResponsive } from '../../utils/responsive';
+import { COLORS, SHADOWS } from '../../theme/tokens';
 
 export default function MySubscriptionsScreen() {
+  const { width, isTablet, isLargeTablet, isSmallDevice, gutter, maxWidth, rf, ms, columns } = useResponsive();
+  void width; void isLargeTablet; void maxWidth; void columns;
   const { subscriptions, loading, fetchMySubscriptions } = useCustomerSubscriptionStore()
   const navigation = useNavigation<NativeStackNavigationProp<any>>()
   const [refreshing, setRefreshing] = useState(false)
@@ -58,17 +62,17 @@ export default function MySubscriptionsScreen() {
   const formatCurrency = (value: string | number) => `₹${Number(value ?? 0).toFixed(2)}`
 
   const RequestItem = React.memo(({ label, value }: { label: string; value: string | number }) => (
-    <View style={styles.statRow}>
+    <View style={[styles.statRow, { width: isTablet ? '31%' : isSmallDevice ? '100%' : '48%', padding: ms(14) }]}>
       <Text style={styles.statLabel}>{label}</Text>
       <Text style={styles.statValue}>{value}</Text>
     </View>
   ))
 
   const SubscriptionCard = React.memo(({ item }: { item: SubscriptionStatsType }) => (
-    <View style={styles.card}>
+    <View style={[styles.card, SHADOWS.card, { flex: isTablet ? 1 : 0 }]}>
       <View style={styles.cardHeader}>
         <View style={styles.titleWrap}>
-          <Text style={styles.productName}>{item.productName}</Text>
+          <Text style={[styles.productName, { fontSize: rf(20) }]}>{item.productName}</Text>
           <View style={styles.unitBadge}>
             <Text style={styles.unitText}>{item.productUnit}</Text>
           </View>
@@ -78,7 +82,7 @@ export default function MySubscriptionsScreen() {
       <Text style={styles.vendorName} numberOfLines={1}>{item.vendorBusinessName}</Text>
 
       <View style={styles.body}>
-        <View style={styles.pillRow}>
+        <View style={[styles.pillRow, { flexWrap: 'wrap' as const, gap: ms(10) }]}>
           <View style={styles.pill}>
             <Text style={styles.pillLabel}>Daily Quantity</Text>
             <Text style={styles.pillValue}>{item.dailyQuantity}</Text>
@@ -91,7 +95,7 @@ export default function MySubscriptionsScreen() {
 
         <View style={styles.divider} />
 
-        <View style={styles.statsGrid}>
+        <View style={[styles.statsGrid, { flexWrap: 'wrap' as const, gap: ms(10) }]}>
           <RequestItem label="Received Days" value={item.receivedDays} />
           <RequestItem label="Skipped Days" value={item.skippedDays} />
           <RequestItem label="Monthly Delivered Qty" value={item.monthlyDeliveredQuantity} />
@@ -103,12 +107,12 @@ export default function MySubscriptionsScreen() {
         <View style={styles.revenueBanner}>
           <View style={styles.revenueTile}>
             <Text style={styles.revenueLabel}>This Month</Text>
-            <Text style={styles.revenueValue}>{formatCurrency(item.monthlyRevenue)}</Text>
+            <Text style={[styles.revenueValue, { fontSize: rf(18) }]}>{formatCurrency(item.monthlyRevenue)}</Text>
           </View>
           <View style={styles.revenueDividerVertical} />
           <View style={styles.revenueTile}>
             <Text style={styles.revenueLabel}>Total to Date</Text>
-            <Text style={styles.revenueValueStrong}>{formatCurrency(item.totalRevenue)}</Text>
+            <Text style={[styles.revenueValueStrong, { fontSize: rf(20) }]}>{formatCurrency(item.totalRevenue)}</Text>
           </View>
         </View>
 
@@ -123,7 +127,7 @@ export default function MySubscriptionsScreen() {
 
       <View style={styles.cardFooter}>
         <TouchableOpacity
-          style={styles.calendarButton}
+          style={[styles.calendarButton, SHADOWS.button, { minHeight: ms(52) }]}
           onPress={() => navigation.navigate('SubscriptionCalendar', { subscriptionId: item.subscriptionId, vendorBusinessName: item.vendorBusinessName, productName: item.productName })}
           activeOpacity={0.8}
         >
@@ -144,9 +148,9 @@ export default function MySubscriptionsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Subscriptions</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]}>
+      <View style={[styles.header, { paddingHorizontal: gutter }]}>
+        <Text style={[styles.headerTitle, { fontSize: rf(30) }]}>My Subscriptions</Text>
         <Text style={styles.headerSubtitle}>
           You have {subscriptions.length} active {subscriptions.length === 1 ? 'subscription' : 'subscriptions'}
         </Text>
@@ -155,7 +159,11 @@ export default function MySubscriptionsScreen() {
       <FlatList
         data={subscriptions}
         keyExtractor={(item) => item.subscriptionId}
-        contentContainerStyle={styles.listContent}
+        key={isTablet ? 't' : 'p'}
+        numColumns={isTablet ? 2 : 1}
+        columnWrapperStyle={isTablet ? { gap: ms(12) } : undefined}
+        style={{ width: '100%', maxWidth: isTablet ? 720 : 520, alignSelf: 'center' }}
+        contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter, paddingBottom: ms(24) }]}
         showsVerticalScrollIndicator={false}
         refreshing={refreshing}
         onRefresh={onRefresh}
@@ -238,7 +246,7 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: '#EEF1F8', marginVertical: 16 },
 
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  statRow: { width: '47%', backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 14, padding: 14 },
+  statRow: { width: '48%', backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 14, padding: 14 },
   statLabel: { fontSize: 12, color: '#64748B', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
   statValue: { fontSize: 16, color: '#0F172A', fontWeight: '800', marginTop: 4 },
 

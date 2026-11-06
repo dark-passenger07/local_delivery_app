@@ -7,11 +7,15 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  ScrollView
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { useAuthStore } from "../../context/vendorContext/AuthContext";
+import { useResponsive } from "../../utils/responsive";
+import { COLORS, SHADOWS } from "../../theme/tokens";
 
 export default function SignupScreen({ navigation }: any) {
   // Form states
@@ -20,8 +24,16 @@ export default function SignupScreen({ navigation }: any) {
   const [address, setAddress] = useState("");
   const [role, setRole] = useState<"CUSTOMER" | "VENDOR">("CUSTOMER");
   const [loading, setLoading] = useState(false);
-  const { signup, sendOtp } = useAuthStore()
+  const { sendOtp } = useAuthStore();
+  const { width, isTablet, isSmallDevice, gutter, maxWidth, rf, ms } =
+    useResponsive();
 
+  const contentWidth = Math.min(maxWidth, width);
+  void contentWidth;
+  const iconSize = isSmallDevice ? ms(64) : ms(76);
+  const titleFontSize = isSmallDevice ? rf(24) : rf(28);
+  const subtitleFontSize = isSmallDevice ? rf(14) : rf(16);
+  const buttonHeight = isSmallDevice ? ms(52) : ms(56);
 
   const handleSignup = async () => {
     if (!name.trim()) {
@@ -93,120 +105,193 @@ export default function SignupScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
       >
-        <View style={styles.iconCircle}>
-          <Text style={styles.iconText}>📝</Text>
-        </View>
-        <Text style={styles.title}>Create Your Account</Text>
-        <Text style={styles.subtitle}>It only takes a minute</Text>
-
-        {/* Full Name */}
-        <Text style={styles.label}>Full Name</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter your full name"
-          placeholderTextColor="#94A3B8"
-          value={name}
-          onChangeText={setName}
-          autoCapitalize="words"
-          editable={!loading}
-        />
-
-        {/* Phone Number */}
-        <Text style={styles.label}>Phone Number</Text>
-        <View style={styles.inputRow}>
-          <View style={styles.countryCodeBox}>
-            <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: "center",
+            paddingHorizontal: gutter,
+            paddingVertical: ms(24),
+            maxWidth: isTablet ? 720 : 520,
+            width: "100%",
+            alignSelf: "center",
+          }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View
+            style={[
+              styles.iconCircle,
+              {
+                width: iconSize,
+                height: iconSize,
+                borderRadius: iconSize / 2,
+              },
+            ]}
+          >
+            <Text style={[styles.iconText, { fontSize: rf(32) }]}>📝</Text>
           </View>
-          <TextInput
-            style={[styles.input, styles.inputFlex]}
-            placeholder="10-digit number"
-            placeholderTextColor="#94A3B8"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            editable={!loading}
-            maxLength={15}
-          />
-        </View>
-
-        {/* Address */}
-        <Text style={styles.label}>Your Address</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          placeholder="House number, street, village/town"
-          placeholderTextColor="#94A3B8"
-          value={address}
-          onChangeText={setAddress}
-          multiline
-          numberOfLines={3}
-          editable={!loading}
-        />
-
-        {/* Role Toggle Switch Component */}
-        <Text style={styles.label}>I am a...</Text>
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[styles.toggleButton, role === "CUSTOMER" && styles.activeToggle]}
-            onPress={() => setRole("CUSTOMER")}
-            activeOpacity={0.8}
-            disabled={loading}
-          >
-            <Text style={styles.toggleIcon}>🛒</Text>
-            <Text style={[styles.toggleText, role === "CUSTOMER" && styles.activeToggleText]}>
-              Customer
-            </Text>
-            <Text style={[styles.toggleSubtext, role === "CUSTOMER" && styles.activeToggleSubtext]}>
-              I want to receive services
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.toggleButton, role === "VENDOR" && styles.activeToggle]}
-            onPress={() => setRole("VENDOR")}
-            activeOpacity={0.8}
-            disabled={loading}
-          >
-            <Text style={styles.toggleIcon}>🏪</Text>
-            <Text style={[styles.toggleText, role === "VENDOR" && styles.activeToggleText]}>
-              Vendor
-            </Text>
-            <Text style={[styles.toggleSubtext, role === "VENDOR" && styles.activeToggleSubtext]}>
-              I want to sell services
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Submit Button */}
-        <TouchableOpacity
-          style={[styles.submitButton, loading && styles.disabledButton]}
-          onPress={handleSignup}
-          disabled={loading}
-          activeOpacity={0.85}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>Continue →</Text>
-          )}
-        </TouchableOpacity>
-
-        {/* Navigation Link */}
-        <TouchableOpacity
-          style={styles.linkButton}
-          onPress={() => !loading && navigation.navigate("Login")}
-          disabled={loading}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.linkText}>
-            Already have an account? <Text style={styles.linkHighlight}>Log In</Text>
+          <Text style={[styles.title, { fontSize: titleFontSize }]}>
+            Create Your Account
           </Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <Text style={[styles.subtitle, { fontSize: subtitleFontSize }]}>
+            It only takes a minute
+          </Text>
+
+          {/* Full Name */}
+          <Text style={[styles.label, { fontSize: rf(15) }]}>Full Name</Text>
+          <TextInput
+            style={[styles.input, { fontSize: rf(17), padding: ms(14) }]}
+            placeholder="Enter your full name"
+            placeholderTextColor={COLORS.inkMuted}
+            value={name}
+            onChangeText={setName}
+            autoCapitalize="words"
+            editable={!loading}
+          />
+
+          {/* Phone Number */}
+          <Text style={[styles.label, { fontSize: rf(15) }]}>Phone Number</Text>
+          <View style={styles.inputRow}>
+            <View style={styles.countryCodeBox}>
+              <Text style={[styles.countryCodeText, { fontSize: rf(15) }]}>
+                +91
+              </Text>
+            </View>
+            <TextInput
+              style={[
+                styles.input,
+                styles.inputFlex,
+                { fontSize: rf(17), padding: ms(14) },
+              ]}
+              placeholder="10-digit number"
+              placeholderTextColor={COLORS.inkMuted}
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              editable={!loading}
+              maxLength={15}
+            />
+          </View>
+
+          {/* Address */}
+          <Text style={[styles.label, { fontSize: rf(15) }]}>Your Address</Text>
+          <TextInput
+            style={[
+              styles.input,
+              styles.textArea,
+              { fontSize: rf(17), padding: ms(14) },
+            ]}
+            placeholder="House number, street, village/town"
+            placeholderTextColor={COLORS.inkMuted}
+            value={address}
+            onChangeText={setAddress}
+            multiline
+            numberOfLines={3}
+            editable={!loading}
+          />
+
+          {/* Role Toggle Switch Component */}
+          <Text style={[styles.label, { fontSize: rf(15) }]}>I am a...</Text>
+          <View style={styles.toggleContainer}>
+            <TouchableOpacity
+              style={[
+                styles.toggleButton,
+                { minHeight: ms(64) },
+                role === "CUSTOMER" && styles.activeToggle,
+              ]}
+              onPress={() => setRole("CUSTOMER")}
+              activeOpacity={0.8}
+              disabled={loading}
+            >
+              <Text style={[styles.toggleIcon, { fontSize: rf(24) }]}>🛒</Text>
+              <Text
+                style={[
+                  styles.toggleText,
+                  { fontSize: rf(15) },
+                  role === "CUSTOMER" && styles.activeToggleText,
+                ]}
+              >
+                Customer
+              </Text>
+              <Text
+                style={[
+                  styles.toggleSubtext,
+                  role === "CUSTOMER" && styles.activeToggleSubtext,
+                ]}
+              >
+                I want to receive services
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.toggleButton,
+                { minHeight: ms(64) },
+                role === "VENDOR" && styles.activeToggle,
+              ]}
+              onPress={() => setRole("VENDOR")}
+              activeOpacity={0.8}
+              disabled={loading}
+            >
+              <Text style={[styles.toggleIcon, { fontSize: rf(24) }]}>🏪</Text>
+              <Text
+                style={[
+                  styles.toggleText,
+                  { fontSize: rf(15) },
+                  role === "VENDOR" && styles.activeToggleText,
+                ]}
+              >
+                Vendor
+              </Text>
+              <Text
+                style={[
+                  styles.toggleSubtext,
+                  role === "VENDOR" && styles.activeToggleSubtext,
+                ]}
+              >
+                I want to sell services
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Submit Button */}
+          <TouchableOpacity
+            style={[
+              styles.submitButton,
+              { height: buttonHeight },
+              loading && styles.disabledButton,
+            ]}
+            onPress={handleSignup}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={[styles.submitButtonText, { fontSize: rf(17) }]}>
+                Create Account
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Navigation Link */}
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() => !loading && navigation.navigate("Login")}
+            disabled={loading}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.linkText, { fontSize: rf(15) }]}>
+              Already have an account?{" "}
+              <Text style={styles.linkHighlight}>Log In</Text>
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -214,44 +299,32 @@ export default function SignupScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F4F6FB",
-  },
-  scrollContent: {
-    padding: 24,
-    paddingBottom: 40,
-    flexGrow: 1,
-    justifyContent: "center",
+    backgroundColor: COLORS.bg,
   },
   iconCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: "#E7ECFB",
+    backgroundColor: COLORS.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "center",
     marginBottom: 18,
   },
   iconText: {
-    fontSize: 34,
+    fontWeight: "700",
   },
   title: {
-    fontSize: 26,
     fontWeight: "800",
     marginBottom: 6,
     textAlign: "center",
-    color: "#0F172A",
+    color: COLORS.ink,
     letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 16,
     fontWeight: "500",
-    color: "#475569",
+    color: COLORS.inkSoft,
     textAlign: "center",
     marginBottom: 30,
   },
   label: {
-    fontSize: 16,
     fontWeight: "800",
     marginBottom: 8,
     color: "#1E293B",
@@ -263,28 +336,25 @@ const styles = StyleSheet.create({
   countryCodeBox: {
     borderWidth: 1.5,
     height: 55,
-    borderColor: "#E2E8F0",
+    borderColor: COLORS.border,
     borderRadius: 14,
     paddingHorizontal: 14,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: COLORS.inputBg,
     alignItems: "center",
     justifyContent: "center",
   },
   countryCodeText: {
-    fontSize: 16,
     fontWeight: "700",
-    color: "#0F172A",
+    color: COLORS.ink,
   },
   input: {
     borderWidth: 1.5,
-    borderColor: "#E2E8F0",
+    borderColor: COLORS.border,
     borderRadius: 14,
-    padding: 16,
     marginBottom: 18,
-    fontSize: 16,
     fontWeight: "500",
-    backgroundColor: "#F8FAFC",
-    color: "#0F172A",
+    backgroundColor: COLORS.inputBg,
+    color: COLORS.ink,
   },
   inputFlex: {
     flex: 1,
@@ -295,65 +365,61 @@ const styles = StyleSheet.create({
   },
   toggleContainer: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
     marginBottom: 28,
   },
   toggleButton: {
     flex: 1,
+    flexBasis: 140,
     paddingVertical: 18,
     paddingHorizontal: 10,
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    justifyContent: "center",
+    backgroundColor: COLORS.inputBg,
     borderWidth: 1.5,
-    borderColor: "#E2E8F0",
+    borderColor: COLORS.border,
     borderRadius: 16,
   },
   activeToggle: {
     backgroundColor: "#DBEAFE",
-    borderColor: "#2563EB",
+    borderColor: COLORS.primary,
   },
   toggleIcon: {
-    fontSize: 26,
     marginBottom: 6,
   },
   toggleText: {
-    fontSize: 16,
     fontWeight: "800",
-    color: "#475569",
+    color: COLORS.inkSoft,
   },
   activeToggleText: {
-    color: "#1D4ED8",
+    color: COLORS.primaryDark,
   },
   toggleSubtext: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#94A3B8",
+    color: COLORS.inkMuted,
     marginTop: 3,
     textAlign: "center",
+    flexShrink: 1,
   },
   activeToggleSubtext: {
-    color: "#2563EB",
+    color: COLORS.primary,
   },
   submitButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: COLORS.primary,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    height: 56,
-    shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 3,
+    ...SHADOWS.button,
   },
   disabledButton: {
-    backgroundColor: "#93C5FD",
+    backgroundColor: COLORS.primaryMuted,
     shadowOpacity: 0,
     elevation: 0,
   },
   submitButtonText: {
     color: "#fff",
-    fontSize: 17,
     fontWeight: "800",
   },
   linkButton: {
@@ -362,12 +428,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   linkText: {
-    color: "#475569",
-    fontSize: 16,
+    color: COLORS.inkSoft,
     fontWeight: "600",
   },
   linkHighlight: {
-    color: "#2563EB",
+    color: COLORS.primary,
     fontWeight: "800",
   },
 });

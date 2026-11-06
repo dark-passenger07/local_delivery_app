@@ -10,7 +10,6 @@ import {
   StyleSheet,
   Alert,
   Platform,
-  Dimensions,
   Linking,
   ScrollView,
   Image,
@@ -21,10 +20,8 @@ import DateTimePicker, { DateTimePickerChangeEvent } from "@react-native-communi
 import { useCustomerHomeContext } from "../../context/customerContext/CustomerHomeContext";
 import { useAuthStore } from "../../context/vendorContext/AuthContext";
 import { useRequestStore } from "../../context/vendorContext/RequestContext";
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const BASE_WIDTH = 375;
-const scale = SCREEN_WIDTH / BASE_WIDTH;
+import { useResponsive } from "../../utils/responsive";
+import { COLORS, SHADOWS } from "../../theme/tokens";
 
 const REQUEST_TYPES = [
   { key: "SKIP", label: "Skip Delivery" },
@@ -33,6 +30,7 @@ const REQUEST_TYPES = [
 ];
 
 export default function HomeScreen() {
+  const { width, isTablet, isLargeTablet, isSmallDevice, gutter, maxWidth, rf, ms, columns } = useResponsive();
   const { user } = useAuthStore();
   const customerName = user?.name?.split(" ")[0] || "there";
 
@@ -49,7 +47,9 @@ export default function HomeScreen() {
     getCustomerSubscribedProducts,
     customerRequest,
     unsubcribeProduct,
-    subcribedProducts
+    subcribedProducts,
+    requestDetails,
+    getAllRequestCustomer
   } = useCustomerHomeContext();
 
   // Component UI States
@@ -75,13 +75,17 @@ export default function HomeScreen() {
   const [showPicker, setShowPicker] = useState<boolean>(false);
   const [pickerMode, setPickerMode] = useState<"start" | "end">("start");
 
-  // Fetch products on mount
+  // Fetch products + existing requests on mount (requests are needed to
+  // lock dates covered by a pending/accepted SKIP request)
   useEffect(() => {
     addPendingNotification();
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        await getCustomerSubscribedProducts();
+        await Promise.all([
+          getCustomerSubscribedProducts(),
+          getAllRequestCustomer().catch(() => {}),
+        ]);
       } catch (error: any) {
         Alert.alert("Error", error.message || "Failed to load products");
       } finally {
@@ -156,6 +160,8 @@ export default function HomeScreen() {
       Alert.alert("Requests Disabled", "Requests are currently disabled. Please try again after 12 PM.");
       return;
     }
+    // Refresh latest requests so SKIP-locked days are up to date on open.
+    getAllRequestCustomer().catch(() => {});
     setSelectedProductId(productId);
     setSelectedProductName(productName);
     setSelectedProductUnit(unit);
@@ -192,6 +198,26 @@ export default function HomeScreen() {
         Alert.alert("That Date Has Passed", "Please choose today or a date in the future.");
         return;
       }
+      // If the picked start day itself falls inside a locked SKIP range,
+      // stop immediately — no request is allowed on those days.
+      const lockedForStart = (requestDetails || []).filter((req: any) => {
+        const sameProduct = req.productId === selectedProductId || req.product?.id === selectedProductId;
+        const status = req.status?.toUpperCase();
+        if (!(sameProduct && req.type === "SKIP" && (status === "PENDING" || status === "ACCEPTED"))) return false;
+        const rs = new Date(req.start_date); rs.setHours(0, 0, 0, 0);
+        const re = new Date(req.end_date); re.setHours(23, 59, 59, 999);
+        return normalizedDate >= rs && normalizedDate <= re;
+      });
+      if (lockedForStart.length > 0) {
+        const status = lockedForStart[0].status?.toUpperCase();
+        Alert.alert(
+          status === "PENDING" ? "Dates Locked" : "Already Skipped",
+          status === "PENDING"
+            ? "This day is part of a pending skip request. You can't make another request on it until the vendor rejects the skip."
+            : "This day is already skipped. You can't make another request on it."
+        );
+        return;
+      }
       setStartDateObj(normalizedDate);
 
       if (endDateObj && normalizedDate > endDateObj) {
@@ -204,6 +230,24 @@ export default function HomeScreen() {
       }
       if (normalizedDate < startDateObj) {
         Alert.alert("Date Problem", "End Date cannot be before Start Date.");
+        return;
+      }
+      // The full [start, end] range must not touch a locked SKIP range.
+      const overlapsLocked = (requestDetails || []).some((req: any) => {
+        const sameProduct = req.productId === selectedProductId || req.product?.id === selectedProductId;
+        const status = req.status?.toUpperCase();
+        if (!(sameProduct && req.type === "SKIP" && (status === "PENDING" || status === "ACCEPTED"))) return false;
+        const rs = new Date(req.start_date); rs.setHours(0, 0, 0, 0);
+        const re = new Date(req.end_date); re.setHours(0, 0, 0, 0);
+        const s = new Date(startDateObj); s.setHours(0, 0, 0, 0);
+        const e = new Date(normalizedDate); e.setHours(0, 0, 0, 0);
+        return s <= re && e >= rs;
+      });
+      if (overlapsLocked) {
+        Alert.alert(
+          "Dates Locked",
+          "This range overlaps days locked by a skip request. You can't make another request on those days until the vendor rejects the skip."
+        );
         return;
       }
       setEndDateObj(normalizedDate);
@@ -219,13 +263,51 @@ export default function HomeScreen() {
     setShowPicker(false);
   };
 
-  // Pick a preset request type
+  // Pick a preset request type. Whenever the type changes, the previously
+  // picked Start/End dates are cleared so a SKIP range can't leak into an
+  // INCREASE/DECREASE request (and vice versa) — the user must re-pick dates.
   const handleSelectRequestType = (key: string, label: string) => {
+    if (key !== requestTypeKey) {
+      setStartDateObj(null);
+      setEndDateObj(null);
+    }
     setRequestTypeKey(key);
     setRequestType(label);
     if (key !== "INCREASE" && key !== "DECREASE") {
       setRequestedQuantity("");
     }
+  };
+
+  // Dates locked by a PENDING or ACCEPTED SKIP request for the currently
+  // selected product. New requests on these days are blocked until the SKIP
+  // is REJECTED by the vendor.
+  const getLockedSkipRanges = () => {
+    if (!selectedProductId) return [];
+    return (requestDetails || []).filter((req: any) => {
+      const sameProduct =
+        req.productId === selectedProductId ||
+        req.product?.id === selectedProductId;
+      const isSkip = req.type === "SKIP";
+      const status = req.status?.toUpperCase();
+      const isLocked = status === "PENDING" || status === "ACCEPTED";
+      return sameProduct && isSkip && isLocked && req.start_date && req.end_date;
+    });
+  };
+
+  const formatShortDate = (dateString: string): string => {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return dateString;
+    return formatDateString(d);
+  };
+
+  const findOverlappingSkip = (start: Date, end: Date) => {
+    const s = new Date(start); s.setHours(0, 0, 0, 0);
+    const e = new Date(end); e.setHours(0, 0, 0, 0);
+    return getLockedSkipRanges().find((req: any) => {
+      const rs = new Date(req.start_date); rs.setHours(0, 0, 0, 0);
+      const re = new Date(req.end_date); re.setHours(0, 0, 0, 0);
+      return s <= re && e >= rs;
+    });
   };
 
   // Submit form data out to your API engine
@@ -244,6 +326,20 @@ export default function HomeScreen() {
     }
     if (!selectedProductId) {
       Alert.alert("Missing Info", "Please select a product first.");
+      return;
+    }
+    // Block any request (SKIP / INCREASE / DECREASE) on days locked by a
+    // pending or accepted SKIP request, until the vendor rejects it.
+    const overlappingSkip: any = findOverlappingSkip(startDateObj, endDateObj);
+    if (overlappingSkip) {
+      const status = overlappingSkip.status?.toUpperCase();
+      const range = `${formatShortDate(overlappingSkip.start_date)} - ${formatShortDate(overlappingSkip.end_date)}`;
+      Alert.alert(
+        status === "PENDING" ? "Dates Locked" : "Already Skipped",
+        status === "PENDING"
+          ? `You already have a pending skip request (${range}). You can't make another request on those days until the vendor rejects it.`
+          : `These days are already skipped (${range}). You can't make another request on skipped days.`
+      );
       return;
     }
     if ((requestTypeKey === "INCREASE" || requestTypeKey === "DECREASE") && !requestedQuantity.trim()) {
@@ -306,31 +402,31 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F4F6FB" />
-      <View style={styles.headerSection}>
+    <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={["top", "left", "right"]}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
+      <View style={[styles.headerSection, { paddingHorizontal: gutter, paddingTop: ms(8), paddingBottom: ms(20) }]}>
         <View style={styles.headerTopRow}>
-          <View style={styles.headerIconCircle}>
-            <Text style={styles.headerIcon}>👋</Text>
+          <View style={[styles.headerIconCircle, { width: ms(52), height: ms(52), borderRadius: ms(26) }]}>
+            <Text style={[styles.headerIcon, { fontSize: rf(28) }]}>👋</Text>
           </View>
           <View style={styles.headerTextContainer}>
-            <Text style={styles.greetingText}>
+            <Text style={[styles.greetingText, { fontSize: rf(16) }]}>
               {getGreeting()}, <Text style={styles.customerNameText}>{customerName}</Text>
             </Text>
-            <Text style={styles.headerTitle}>Your Services</Text>
+            <Text style={[styles.headerTitle, { fontSize: rf(28) }]}>Your Services</Text>
           </View>
-          <Image source={require("../../assets/helpinghandslogo.png")} style={styles.headerLogo} />
+          <Image source={require("../../assets/helpinghandslogo.png")} style={[styles.headerLogo, { width: ms(40), height: ms(40) }]} />
         </View>
-        <View style={styles.headerBadgeRow}>
-          <View style={styles.headerBadge}>
+        <View style={[styles.headerBadgeRow, { flexWrap: isSmallDevice ? 'wrap' as const : 'nowrap' as const }]}>
+          <View style={[styles.headerBadge, SHADOWS.card]}>
             <Text style={styles.headerBadgeIcon}>📦</Text>
-            <Text style={styles.headerBadgeText}>
+            <Text style={[styles.headerBadgeText, { fontSize: rf(13) }]}>
               {subcribedProducts.length} {subcribedProducts.length === 1 ? "Service" : "Services"}
             </Text>
           </View>
-          <View style={styles.headerBadge}>
+          <View style={[styles.headerBadge, SHADOWS.card]}>
             <Text style={styles.headerBadgeIcon}>⚡</Text>
-            <Text style={styles.headerBadgeText}>Delivering Daily</Text>
+            <Text style={[styles.headerBadgeText, { fontSize: rf(13) }]}>Delivering Daily</Text>
           </View>
         </View>
       </View>
@@ -338,7 +434,8 @@ export default function HomeScreen() {
       <FlatList
         data={subcribedProducts}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        style={{ width: '100%', maxWidth: isTablet ? 720 : 520, alignSelf: 'center' }}
+        contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter, paddingBottom: ms(24) }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -354,9 +451,9 @@ export default function HomeScreen() {
         renderItem={({ item }) => {
           const isUnsubscribing = unsubscribingId === item.id;
           return (
-            <View style={styles.productCard}>
+            <View style={[styles.productCard, SHADOWS.card, { padding: ms(20) }]}>
               <View style={styles.cardTopRow}>
-                <Text style={styles.productName}>{item.productName}</Text>
+                <Text style={[styles.productName, { fontSize: rf(18) }]}>{item.productName}</Text>
                 <View style={styles.activeBadge}>
                   <View style={styles.activeDot} />
                   <Text style={styles.activeBadgeText}>Running</Text>
@@ -403,7 +500,7 @@ export default function HomeScreen() {
                   )}
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.actionButton, styles.requestButton, (isUnsubscribing || isRequestDisabled()) && styles.disabledActionButton]}
+                  style={[styles.actionButton, styles.requestButton, SHADOWS.button, (isUnsubscribing || isRequestDisabled()) && styles.disabledActionButton]}
                   onPress={() => handleOpenForm(item.id, item.productName, item.unit)}
                   activeOpacity={0.8}
                 >
@@ -424,7 +521,7 @@ export default function HomeScreen() {
         onRequestClose={closeForm}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+          <View style={[styles.modalContainer, { width: '100%', maxWidth: Math.min(width * 0.92, isTablet ? 560 : 440), alignSelf: 'center' }]}>
             <ScrollView
               style={styles.modalScroll}
               contentContainerStyle={styles.modalScrollContent}
@@ -466,8 +563,8 @@ export default function HomeScreen() {
               )}
 
               <Text style={styles.label}>2. Choose your dates</Text>
-              <View style={styles.dateRow}>
-                <View style={styles.dateColumn}>
+              <View style={[styles.dateRow, { flexDirection: isSmallDevice ? 'column' as const : 'row' as const, gap: ms(12) }]}>
+                <View style={[styles.dateColumn, { flex: isSmallDevice ? 0 : 1 }]}>
                   <Text style={styles.dateColumnLabel}>Start Date</Text>
                   <TouchableOpacity style={styles.datePickerButton} onPress={() => openDatePicker("start")} activeOpacity={0.8}>
                     <Text style={styles.datePickerIcon}>📅</Text>
@@ -476,7 +573,7 @@ export default function HomeScreen() {
                     </Text>
                   </TouchableOpacity>
                 </View>
-                <View style={styles.dateColumn}>
+                <View style={[styles.dateColumn, { flex: isSmallDevice ? 0 : 1 }]}>
                   <Text style={styles.dateColumnLabel}>End Date</Text>
                   <TouchableOpacity style={styles.datePickerButton} onPress={() => openDatePicker("end")} activeOpacity={0.8}>
                     <Text style={styles.datePickerIcon}>📅</Text>
@@ -548,52 +645,52 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F6FB" },
   centerContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F4F6FB" },
-  loadingText: { marginTop: 12 * scale, color: "#4B5563", fontSize: 16 * scale, fontWeight: "600" },
+  loadingText: { marginTop: 12, color: "#4B5563", fontSize: 16, fontWeight: "600" },
 
   headerSection: {
-    paddingHorizontal: 20 * scale,
-    paddingTop: 8 * scale,
-    paddingBottom: 20 * scale
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 20
   },
   headerTopRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16 * scale
+    marginBottom: 16
   },
   headerIconCircle: {
-    width: 52 * scale,
-    height: 52 * scale,
-    borderRadius: 26 * scale,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: "#EEF2FF",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 14 * scale,
+    marginRight: 14,
     borderWidth: 2,
     borderColor: "#E0E7FF"
   },
-  headerIcon: { fontSize: 28 * scale },
-  headerLogo: { width: 40 * scale, height: 40 * scale, resizeMode: "contain" },
+  headerIcon: { fontSize: 28 },
+  headerLogo: { width: 40, height: 40, resizeMode: "contain" },
   headerTextContainer: { flex: 1 },
-  greetingText: { fontSize: 16 * scale, color: "#64748B", fontWeight: "600" },
+  greetingText: { fontSize: 16, color: "#64748B", fontWeight: "600" },
   customerNameText: { color: "#2563EB", fontWeight: "800" },
   headerTitle: {
-    fontSize: 28 * scale,
+    fontSize: 28,
     fontWeight: "800",
     color: "#0F172A",
-    letterSpacing: -0.5 * scale,
-    marginTop: 2 * scale
+    letterSpacing: -0.5,
+    marginTop: 2
   },
   headerBadgeRow: {
     flexDirection: "row",
-    gap: 10 * scale
+    gap: 10
   },
   headerBadge: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 14 * scale,
-    paddingVertical: 10 * scale,
-    borderRadius: 14 * scale,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#E2E8F0",
     shadowColor: "#0F172A",
@@ -602,161 +699,161 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 1,
   },
-  headerBadgeIcon: { fontSize: 18 * scale, marginRight: 6 * scale },
-  headerBadgeText: { fontSize: 13 * scale, fontWeight: "700", color: "#334155" },
+  headerBadgeIcon: { fontSize: 18, marginRight: 6 },
+  headerBadgeText: { fontSize: 13, fontWeight: "700", color: "#334155" },
 
-  listContent: { paddingHorizontal: 20 * scale, paddingBottom: 24 * scale, flexGrow: 1 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 24, flexGrow: 1 },
 
-  emptyContainer: { alignItems: "center", justifyContent: "center", marginTop: 80 * scale, paddingHorizontal: 32 * scale },
+  emptyContainer: { alignItems: "center", justifyContent: "center", marginTop: 80, paddingHorizontal: 32 },
   emptyIconCircle: {
-    width: 84 * scale, height: 84 * scale, borderRadius: 42 * scale, backgroundColor: "#E7ECFB",
-    alignItems: "center", justifyContent: "center", marginBottom: 18 * scale
+    width: 84, height: 84, borderRadius: 42, backgroundColor: "#E7ECFB",
+    alignItems: "center", justifyContent: "center", marginBottom: 18
   },
-  emptyIconText: { fontSize: 36 * scale },
-  emptyTitle: { fontSize: 20 * scale, fontWeight: "800", color: "#0F172A", marginBottom: 6 * scale },
-  emptyText: { textAlign: "center", color: "#475569", fontSize: 16 * scale, lineHeight: 22 * scale },
+  emptyIconText: { fontSize: 36 },
+  emptyTitle: { fontSize: 20, fontWeight: "800", color: "#0F172A", marginBottom: 6 },
+  emptyText: { textAlign: "center", color: "#475569", fontSize: 16, lineHeight: 22 },
 
   productCard: {
     backgroundColor: "#FFFFFF",
-    padding: 20 * scale,
-    borderRadius: 20 * scale,
-    marginBottom: 18 * scale,
+    padding: 20,
+    borderRadius: 20,
+    marginBottom: 18,
     shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 4 * scale },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.07,
-    shadowRadius: 14 * scale,
+    shadowRadius: 14,
     elevation: 3,
     borderWidth: 1,
     borderColor: "#EEF1F8"
   },
   cardTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  productName: { fontSize: 20 * scale, fontWeight: "800", color: "#0F172A", flexShrink: 1, marginRight: 8 * scale },
+  productName: { fontSize: 20, fontWeight: "800", color: "#0F172A", flexShrink: 1, marginRight: 8 },
 
   activeBadge: {
     flexDirection: "row", alignItems: "center", backgroundColor: "#DCFCE7",
-    paddingHorizontal: 10 * scale, paddingVertical: 6 * scale, borderRadius: 20 * scale
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20
   },
-  activeDot: { width: 7 * scale, height: 7 * scale, borderRadius: 4 * scale, backgroundColor: "#16A34A", marginRight: 6 * scale },
-  activeBadgeText: { fontSize: 13 * scale, fontWeight: "800", color: "#15803D" },
+  activeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#16A34A", marginRight: 6 },
+  activeBadgeText: { fontSize: 13, fontWeight: "800", color: "#15803D" },
 
-  productDesc: { fontSize: 15 * scale, color: "#475569", marginTop: 8 * scale, lineHeight: 21 * scale },
+  productDesc: { fontSize: 15, color: "#475569", marginTop: 8, lineHeight: 21 },
 
-  vendorDivider: { height: 1 * scale, backgroundColor: "#EEF1F8", marginVertical: 16 * scale },
+  vendorDivider: { height: 1, backgroundColor: "#EEF1F8", marginVertical: 16 },
 
   vendorRow: { flexDirection: "row", alignItems: "center" },
   avatarCircle: {
-    width: 48 * scale, height: 48 * scale, borderRadius: 24 * scale, backgroundColor: "#2563EB",
-    alignItems: "center", justifyContent: "center", marginRight: 14 * scale
+    width: 48, height: 48, borderRadius: 24, backgroundColor: "#2563EB",
+    alignItems: "center", justifyContent: "center", marginRight: 14
   },
-  avatarText: { color: "#FFFFFF", fontWeight: "800", fontSize: 16 * scale },
+  avatarText: { color: "#FFFFFF", fontWeight: "800", fontSize: 16 },
   vendorInfo: { flex: 1 },
-  vendorLabel: { fontSize: 12 * scale, color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 * scale },
-  vendorName: { fontSize: 16 * scale, fontWeight: "700", color: "#0F172A", marginTop: 1 * scale },
-  vendorDetail: { fontSize: 14 * scale, color: "#64748B", marginTop: 2 * scale },
+  vendorLabel: { fontSize: 12, color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
+  vendorName: { fontSize: 16, fontWeight: "700", color: "#0F172A", marginTop: 1 },
+  vendorDetail: { fontSize: 14, color: "#64748B", marginTop: 2 },
 
   callButton: {
-    width: 60 * scale, height: 52 * scale, borderRadius: 14 * scale,
+    width: 60, height: 52, borderRadius: 14,
     backgroundColor: "#DCFCE7",
-    borderWidth: 1.5 * scale, borderColor: "#BBF7D0",
+    borderWidth: 1.5, borderColor: "#BBF7D0",
     alignItems: "center", justifyContent: "center",
-    marginLeft: 8 * scale
+    marginLeft: 8
   },
-  callButtonIcon: { fontSize: 18 * scale },
-  callButtonText: { fontSize: 11 * scale, fontWeight: "800", color: "#15803D", marginTop: 1 * scale },
+  callButtonIcon: { fontSize: 18 },
+  callButtonText: { fontSize: 11, fontWeight: "800", color: "#15803D", marginTop: 1 },
 
-  actionRow: { flexDirection: "row", marginTop: 18 * scale, gap: 12 * scale },
+  actionRow: { flexDirection: "row", marginTop: 18, gap: 12 },
   actionButton: {
-    flex: 1, flexDirection: "row", paddingVertical: 15 * scale, borderRadius: 14 * scale,
-    alignItems: "center", justifyContent: "center", gap: 6 * scale
+    flex: 1, flexDirection: "row", paddingVertical: 15, borderRadius: 14,
+    alignItems: "center", justifyContent: "center", gap: 6
   },
-  unsubscribeButton: { backgroundColor: "#FEF2F2", borderWidth: 1.5 * scale, borderColor: "#FECACA" },
-  unsubscribeButtonIcon: { color: "#DC2626", fontWeight: "800", fontSize: 14 * scale },
-  unsubscribeButtonText: { color: "#DC2626", fontWeight: "800", fontSize: 15 * scale },
+  unsubscribeButton: { backgroundColor: "#FEF2F2", borderWidth: 1.5, borderColor: "#FECACA" },
+  unsubscribeButtonIcon: { color: "#DC2626", fontWeight: "800", fontSize: 14 },
+  unsubscribeButtonText: { color: "#DC2626", fontWeight: "800", fontSize: 15 },
   requestButton: {
     backgroundColor: "#2563EB",
     shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 4 * scale },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
-    shadowRadius: 8 * scale,
+    shadowRadius: 8,
     elevation: 3
   },
   disabledActionButton: {
     opacity: 0.5,
   },
-  requestButtonIcon: { fontSize: 15 * scale },
-  requestButtonText: { color: "#FFFFFF", fontWeight: "800", fontSize: 15 * scale },
+  requestButtonIcon: { fontSize: 15 },
+  requestButtonText: { color: "#FFFFFF", fontWeight: "800", fontSize: 15 },
 
   modalOverlay: { flex: 1, backgroundColor: "rgba(15,23,42,0.6)", justifyContent: "flex-end" },
   modalContainer: {
     flex: 1,
     maxHeight: "88%",
     backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 28 * scale,
-    borderTopRightRadius: 28 * scale,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     flexDirection: 'column'
   },
   modalScroll: {
     flex: 1,
-    paddingHorizontal: 24 * scale,
-    paddingTop: 24 * scale
+    paddingHorizontal: 24,
+    paddingTop: 24
   },
   modalScrollContent: {
-    paddingBottom: 8 * scale
+    paddingBottom: 8
   },
   modalHandle: {
-    width: 44 * scale, height: 5 * scale, borderRadius: 3 * scale, backgroundColor: "#E2E8F0",
-    alignSelf: "center", marginBottom: 18 * scale
+    width: 44, height: 5, borderRadius: 3, backgroundColor: "#E2E8F0",
+    alignSelf: "center", marginBottom: 18
   },
-  modalTitle: { fontSize: 22 * scale, fontWeight: "800", color: "#0F172A", textAlign: "center" },
-  modalSubtitle: { fontSize: 15 * scale, color: "#2563EB", fontWeight: "700", textAlign: "center", marginTop: 4 * scale, marginBottom: 22 * scale },
+  modalTitle: { fontSize: 22, fontWeight: "800", color: "#0F172A", textAlign: "center" },
+  modalSubtitle: { fontSize: 15, color: "#2563EB", fontWeight: "700", textAlign: "center", marginTop: 4, marginBottom: 22 },
 
-  label: { fontSize: 16 * scale, fontWeight: "800", color: "#1E293B", marginBottom: 10 * scale },
+  label: { fontSize: 16, fontWeight: "800", color: "#1E293B", marginBottom: 10 },
   input: {
-    borderWidth: 1.5 * scale, borderColor: "#E2E8F0", borderRadius: 14 * scale, padding: 14 * scale,
-    marginBottom: 16 * scale, fontSize: 16 * scale, backgroundColor: "#F8FAFC", color: "#0F172A"
+    borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 14, padding: 14,
+    marginBottom: 16, fontSize: 16, backgroundColor: "#F8FAFC", color: "#0F172A"
   },
-  textArea: { height: 100 * scale, textAlignVertical: "top" },
+  textArea: { height: 100, textAlignVertical: "top" },
 
-  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 10 * scale, marginBottom: 18 * scale },
+  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 18 },
   chip: {
-    paddingVertical: 12 * scale, paddingHorizontal: 16 * scale, borderRadius: 12 * scale,
-    backgroundColor: "#F1F5F9", borderWidth: 1.5 * scale, borderColor: "#E2E8F0",
-    minHeight: 44 * scale, alignItems: "center", justifyContent: "center"
+    paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12,
+    backgroundColor: "#F1F5F9", borderWidth: 1.5, borderColor: "#E2E8F0",
+    minHeight: 44, alignItems: "center", justifyContent: "center"
   },
   chipSelected: { backgroundColor: "#DBEAFE", borderColor: "#2563EB" },
-  chipText: { fontSize: 15 * scale, fontWeight: "700", color: "#475569" },
+  chipText: { fontSize: 15, fontWeight: "700", color: "#475569" },
   chipTextSelected: { color: "#1D4ED8" },
 
-  dateRow: { flexDirection: SCREEN_WIDTH < 340 ? "column" : "row", gap: 12 * scale },
-  dateColumn: { flex: SCREEN_WIDTH < 340 ? 0 : 1 },
-  dateColumnLabel: { fontSize: 13 * scale, fontWeight: "700", color: "#64748B", marginBottom: 6 * scale },
+  dateRow: { flexDirection: "row" as const, gap: 12 },
+  dateColumn: { flex: 1 },
+  dateColumnLabel: { fontSize: 13, fontWeight: "700", color: "#64748B", marginBottom: 6 },
   datePickerButton: {
-    flexDirection: "row", alignItems: "center", gap: 8 * scale,
-    borderWidth: 1.5 * scale, borderColor: "#E2E8F0", borderRadius: 14 * scale, padding: 14 * scale,
-    marginBottom: 16 * scale, backgroundColor: "#F8FAFC",
-    minHeight: 52 * scale
+    flexDirection: "row", alignItems: "center", gap: 8,
+    borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 14, padding: 14,
+    marginBottom: 16, backgroundColor: "#F8FAFC",
+    minHeight: 52
   },
-  datePickerIcon: { fontSize: 16 * scale },
-  dateText: { fontSize: 15 * scale, color: "#0F172A", fontWeight: "700" },
-  placeholderText: { fontSize: 14 * scale, color: "#94A3B8", fontWeight: "600" },
+  datePickerIcon: { fontSize: 16 },
+  dateText: { fontSize: 15, color: "#0F172A", fontWeight: "700" },
+  placeholderText: { fontSize: 14, color: "#94A3B8", fontWeight: "600" },
   datePickerContainer: {
     backgroundColor: "#FFFFFF",
-    paddingVertical: 10 * scale,
+    paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0"
   },
 
-  modalActionRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 10 * scale, gap: 12 * scale, paddingHorizontal: 24 * scale, paddingBottom: 34 * scale },
-  modalButton: { flex: 1, paddingVertical: 16 * scale, borderRadius: 14 * scale, alignItems: "center", minHeight: 52 * scale },
+  modalActionRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 10, gap: 12, paddingHorizontal: 24, paddingBottom: 34 },
+  modalButton: { flex: 1, paddingVertical: 16, borderRadius: 14, alignItems: "center", minHeight: 52 },
   cancelButton: { backgroundColor: "#F1F5F9" },
-  cancelButtonText: { color: "#334155", fontWeight: "800", fontSize: 15 * scale },
+  cancelButtonText: { color: "#334155", fontWeight: "800", fontSize: 15 },
   submitButton: {
     backgroundColor: "#2563EB",
     shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 4 * scale },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
-    shadowRadius: 8 * scale,
+    shadowRadius: 8,
     elevation: 3
   },
-  submitButtonText: { color: "#FFFFFF", fontWeight: "800", fontSize: 15 * scale }
+  submitButtonText: { color: "#FFFFFF", fontWeight: "800", fontSize: 15 }
 });
