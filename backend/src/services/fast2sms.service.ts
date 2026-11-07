@@ -105,6 +105,8 @@ export async function sendOtp(
   });
 
   const code = generateOtpCode();
+  // console.log("code-------------------------")
+  // console.log("code:- ", code)
   const expiresAt = buildExpiresAt();
 
   // Persist the OTP BEFORE calling Fast2SMS. If the SMS fails the row is left

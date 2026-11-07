@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
+  StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
@@ -136,7 +137,8 @@ export default function OtpVerificationScreen({ route, navigation }: any) {
   const digits = code.split("");
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F4F6FB" />
       <View style={styles.content}>
         <View style={styles.iconCircle}>
           <Text style={styles.iconText}>🔐</Text>

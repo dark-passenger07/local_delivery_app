@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { sendOtp, verifyOtp, resendOtp } from "../services/fast2sms.service.js";
+import { db } from "../libs/db.js";
 import type { OtpPurpose } from "@prisma/client";
 
 // ---------------------------------------------------------------------------
@@ -22,6 +23,18 @@ const CodeSchema = z
   .trim()
   .length(6, { message: "OTP must be exactly 6 digits." })
   .regex(/^\d{6}$/, { message: "OTP must contain only digits." });
+
+// Login OTPs must only be sent to phones that already have an account.
+async function userExists(phone: string): Promise<boolean> {
+  const user = await db.user.findUnique({
+    where: { phone },
+    select: { id: true },
+  });
+  return Boolean(user);
+}
+
+const USER_NOT_FOUND_MESSAGE =
+  "No account found with this phone number. Please sign up first.";
 
 // ---------------------------------------------------------------------------
 // POST /otp/send
@@ -50,6 +63,14 @@ export const sendOtpHandler = async (req: Request, res: Response) => {
     }
 
     const { phone, purpose } = parsed.data;
+
+    // For login, make sure the account exists before spending an SMS.
+    if (purpose === "LOGIN" && !(await userExists(phone))) {
+      return res.status(404).json({
+        success: false,
+        message: USER_NOT_FOUND_MESSAGE,
+      });
+    }
 
     await sendOtp(phone, purpose as OtpPurpose);
 
@@ -145,6 +166,14 @@ export const resendOtpHandler = async (req: Request, res: Response) => {
     }
 
     const { phone, purpose } = parsed.data;
+
+    // Keep resend consistent with the initial login send.
+    if (purpose === "LOGIN" && !(await userExists(phone))) {
+      return res.status(404).json({
+        success: false,
+        message: USER_NOT_FOUND_MESSAGE,
+      });
+    }
 
     await resendOtp(phone, purpose as OtpPurpose);
 

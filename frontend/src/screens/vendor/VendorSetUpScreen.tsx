@@ -10,7 +10,8 @@ import {
   Platform,
   ScrollView,
   Image,
-  Alert
+  Alert,
+  StatusBar
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -112,7 +113,8 @@ const VendorSetUpScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -290,8 +292,10 @@ const styles = StyleSheet.create({
   },
   uploadLabelRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 8,
+    columnGap: 8,
+    rowGap: 6,
     marginBottom: 10,
   },
   uploadLabel: {
@@ -311,6 +315,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   uploadBox: {
+    width: '100%',
     borderWidth: 2,
     borderColor: '#BFD3F5',
     borderStyle: 'dashed',
@@ -344,6 +349,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    maxWidth: '100%',
     backgroundColor: COLORS.primary,
     paddingHorizontal: 18,
     paddingVertical: 10,
@@ -382,6 +388,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.primary,
+    flexShrink: 1,
+    textAlign: 'center',
   },
   previewRemoveText: {
     color: '#DC2626',

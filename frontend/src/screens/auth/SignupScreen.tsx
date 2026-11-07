@@ -10,6 +10,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
@@ -104,7 +105,8 @@ export default function SignupScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
@@ -285,10 +287,14 @@ export default function SignupScreen({ navigation }: any) {
             disabled={loading}
             activeOpacity={0.7}
           >
-            <Text style={[styles.linkText, { fontSize: rf(15) }]}>
-              Already have an account?{" "}
-              <Text style={styles.linkHighlight}>Log In</Text>
-            </Text>
+            <View style={styles.linkRow}>
+              <Text style={[styles.linkText, { fontSize: rf(15) }]}>
+                Already have an account?
+              </Text>
+              <Text style={[styles.linkHighlight, { fontSize: rf(15) }]}>
+                Log In
+              </Text>
+            </View>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -424,12 +430,24 @@ const styles = StyleSheet.create({
   },
   linkButton: {
     marginTop: 22,
+    alignSelf: "stretch",
     alignItems: "center",
     paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  linkRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    alignItems: "center",
+    columnGap: 4,
+    rowGap: 2,
   },
   linkText: {
     color: COLORS.inkSoft,
     fontWeight: "600",
+    textAlign: "center",
+    flexShrink: 1,
   },
   linkHighlight: {
     color: COLORS.primary,
