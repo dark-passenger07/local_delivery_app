@@ -15,7 +15,7 @@ import {
   Image,
   StatusBar
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import DateTimePicker, { DateTimePickerChangeEvent } from "@react-native-community/datetimepicker";
 import { useCustomerHomeContext } from "../../context/customerContext/CustomerHomeContext";
 import { useAuthStore } from "../../context/vendorContext/AuthContext";
@@ -31,6 +31,7 @@ const REQUEST_TYPES = [
 
 export default function HomeScreen() {
   const { width, isTablet, isLargeTablet, isSmallDevice, gutter, maxWidth, rf, ms, columns } = useResponsive();
+  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const customerName = user?.name?.split(" ")[0] || "there";
 
@@ -613,7 +614,7 @@ export default function HomeScreen() {
               </View>
             )}
 
-            <View style={styles.modalActionRow}>
+            <View style={[styles.modalActionRow, { paddingBottom: Math.max(insets.bottom + 16, 24) }]}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={closeForm}
